@@ -26,12 +26,79 @@ class Stack:
 
     def is_empty(self):
         return len(self.items) == 0
+    
+class Node:
+    def __init__(self, data):
+        self.data = data  # data will be of the form [x, y]
+        self.next = None
+
+class LinkedList:
+    def __init__(self):
+        self.head = None
+
+    def add(self, item):
+        """Add a new item to the end of the list."""
+        new_node = Node(item)
+        if not self.head:
+            self.head = new_node
+        else:
+            current = self.head
+            while current.next:
+                current = current.next
+            current.next = new_node
+
+    def remove(self, item):
+        """Remove the first occurrence of the item from the list."""
+        current = self.head
+        prev = None
+        while current:
+            if current.data == item:
+                if prev:
+                    prev.next = current.next
+                else:
+                    self.head = current.next
+                return
+            prev = current
+            current = current.next
+
+    def find(self, item):
+        """Find an item in the list. Returns True if found, False otherwise."""
+        current = self.head
+        while current:
+            if current.data == item:
+                return True
+            current = current.next
+        return False
+
+    def get(self, index):
+        """Get the item at a specific index. Returns None if index is out of bounds."""
+        current = self.head
+        count = 0
+        while current:
+            if count == index:
+                return current.data
+            current = current.next
+            count += 1
+        return None
+
+    def size(self):
+        """Return the size of the list."""
+        count = 0
+        current = self.head
+        while current:
+            count += 1
+            current = current.next
+        return count
+
+    def is_empty(self):
+        """Check if the list is empty."""
+        return self.head is None
 
 class Explorer(AbstAgent):
     """ class attribute """
     MAX_DIFFICULTY = 1             # the maximum degree of difficulty to enter into a cell
     
-    def __init__(self, env, config_file, resc):
+    def __init__(self, env, config_file, resc, dir):
         """ Construtor do agente random on-line
         @param env: a reference to the environment 
         @param config_file: the absolute path to the explorer's config file
@@ -48,24 +115,28 @@ class Explorer(AbstAgent):
         self.map = Map()           # create a map for representing the environment
         self.victims = {}          # a dictionary of found victims: (seq): ((x,y), [<vs>])
                                    # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
+        self.first_direction = (dir - 1) * 2
+        self.direction = (dir - 1) * 2
+        self.lista = LinkedList()
 
         # put the current position - the base - in the map
         self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
 
     def get_next_position(self):
-        """ Randomically, gets the next position that can be explored (no wall and inside the grid)
-            There must be at least one CLEAR position in the neighborhood, otherwise it loops forever.
-        """
-        # Check the neighborhood walls and grid limits
         obstacles = self.check_walls_and_lim()
-    
-        # Loop until a CLEAR position is found
+
+        dir = (self.direction + 1) % 8
+
+        if obstacles[(dir + 3) % 8] == VS.END:
+            self.direction = (self.direction + 2) % 8
+
         while True:
-            # Get a random direction
-            direction = random.randint(0, 7)
-            # Check if the corresponding position in walls_and_lim is CLEAR
-            if obstacles[direction] == VS.CLEAR:
-                return Explorer.AC_INCR[direction]
+            dir = (dir + 1) % 8
+            dx, dy = Explorer.AC_INCR[dir]
+            if obstacles[dir] == VS.CLEAR and self.lista.find([self.x + dx, self.y + dy]) is False:
+                self.lista.add([self.x + dx, self.y + dy])
+                return Explorer.AC_INCR[dir]
+                
         
     def explore(self):
         # get an random increment for x and y       
