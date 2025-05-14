@@ -198,7 +198,7 @@ class Rescuer(AbstAgent):
 
         self.received_maps += 1
 
-        print(f"{self.NAME} Map received from the explorer")
+        print(f"\n{self.NAME} Map received from the explorer")
         self.map.update(explorer_map)
         self.victims.update(victims)
 

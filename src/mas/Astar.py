@@ -12,15 +12,23 @@ class Node:
         return self.f < other.f
 
 class Astar:
-    def __init__(self, map_obj, cost_line=1.0, cost_diag=1.5):
+    def __init__(self, map_obj=None, explorer=None, cost_line=1.0, cost_diag=1.5):
         """
         map_obj: instância de Map preenchida pelo Explorer
         cost_line: custo para andar em linha reta
         cost_diag: custo para andar na diagonal
         """
         self.map = map_obj
+        self.explorer = explorer
         self.cost_line = cost_line
         self.cost_diag = cost_diag
+        
+    def set_map(self, map_obj):
+        """
+        Atualiza o mapa atual.
+        map_obj: instância de Map preenchida pelo Explorer
+        """
+        self.map = map_obj
 
     def heuristic(self, start, end):
         """
@@ -231,6 +239,10 @@ class Astar:
         goal: (x, y)
         Retorna lista de posições [(x1, y1), ...] ou None se não houver caminho.
         """
+        
+        if self.explorer.get_name == "EXPL_1":
+                print(f"Explorador: {self.explorer.get_name()} OI")
+                
         # Fila de prioridade (Heap mínimo) para os nós a serem explorados 
         open_set = []
         heapq.heappush(open_set, Node(start, None, 0, self.heuristic(start, goal)))
@@ -240,8 +252,15 @@ class Astar:
         
         # Dicionário para armazenar os custos g (custo do início até o nó)
         g_scores = {start: 0}
+        
+        if self.explorer.get_name == "EXPL_1":
+                print(f"Explorador: {self.explorer.get_name()} COMEÇANDO")
+        
+        # print(f"Start: {start}, Goal: {goal}")
 
         while open_set:
+            if self.explorer.get_name == "EXPL_1":
+                print(f"Explorador: {self.explorer.get_name()} - A* - Open set: {len(open_set)}, Closed set: {len(closed_set)}")
             current = heapq.heappop(open_set)
             if current.position == goal:
                 return self.reconstruct_path(current)

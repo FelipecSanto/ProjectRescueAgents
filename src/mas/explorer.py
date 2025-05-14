@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from vs.abstract_agent import AbstAgent
 from vs.constants import VS
 from map import Map
+from Astar import Astar
 
 class Stack:
     def __init__(self):
@@ -109,7 +110,7 @@ class Explorer(AbstAgent):
 
         super().__init__(env, config_file)
         self.walk_stack = Stack()  # a stack to store the movements
-        self.walk_time = 0         # time consumed to walk when exploring (to decide when to come back)
+        self.walk_time = 0        # time consumed to walk when exploring (to decide when to come back)
         self.set_state(VS.ACTIVE)  # explorer is active since the begin
         self.resc = resc           # reference to the rescuer agent
         self.x = 0                 # current x position relative to the origin 0
@@ -120,9 +121,26 @@ class Explorer(AbstAgent):
         self.quadrante = dir - 1
         self.direction = (dir - 1) * 2
         self.lista = LinkedList()
+        self.return_time = (self.get_rtime() * 5) / 10
+        self.total_time = self.get_rtime()
+        
+        self.aStar = Astar(self.map, self)
+        
+        self.max_x = 0
+        self.max_y = 0
+        self.tam_quad_explored = 0
+        
+        self.limit_x = 0
+        self.limit_y = 0
+        self.tam_quad = 0
+        self.pixels_walked = 0
 
         # put the current position - the base - in the map
         self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
+        
+    def get_name(self):
+        """ Returns the name of the agent """
+        return self.NAME
 
     def get_next_position(self):
         # Checa obstáculos em volta
@@ -152,9 +170,17 @@ class Explorer(AbstAgent):
                 if self.y == 0 and self.direction == 4:
                     self.direction = (self.direction + 4) % 8
                     dir = 2
-                if obstacles[dir] == VS.END and self.direction == 0:
+                
+                
+                if obstacles[0] == VS.END:
+                    self.limit_y =  self.y
+                if obstacles[2] == VS.END:
+                    self.limit_x = self.x
+                
+                if obstacles[dir] == VS.END and self.direction == 0:    
                     self.direction = (self.direction + 4) % 8
                     dir = 2
+                
                 dx, dy = Explorer.AC_INCR[dir]
                 if self.x + dx < 0 or self.y + dy > 0:
                     continue
@@ -166,9 +192,16 @@ class Explorer(AbstAgent):
                 if self.x == 0 and self.direction == 6:
                     self.direction = (self.direction + 4) % 8
                     dir = 4
+                    
+                if obstacles[4] == VS.END:
+                    self.limit_y =  self.y
+                if obstacles[2] == VS.END:
+                    self.limit_x = self.x
+                
                 if obstacles[dir] == VS.END and self.direction == 2:
                     self.direction = (self.direction + 4) % 8
                     dir = 4
+                
                 dx, dy = Explorer.AC_INCR[dir]
                 if self.x + dx < 0 or self.y + dy < 0:
                     continue
@@ -180,9 +213,16 @@ class Explorer(AbstAgent):
                 if self.x == 0 and self.direction == 0:
                     self.direction = (self.direction + 4) % 8
                     dir = 6
+                    
+                if obstacles[4] == VS.END:
+                    self.limit_y =  self.y
+                if obstacles[6] == VS.END:
+                    self.limit_x = self.x
+                
                 if obstacles[dir] == VS.END and self.direction == 4:
                     self.direction = (self.direction + 4) % 8
                     dir = 6
+                
                 dx, dy = Explorer.AC_INCR[dir]
                 if self.x + dx > 0 or self.y + dy < 0:
                     continue
@@ -194,9 +234,16 @@ class Explorer(AbstAgent):
                 if self.y == 0 and self.direction == 2:
                     self.direction = (self.direction + 4) % 8
                     dir = 0
+                    
+                if obstacles[4] == VS.END:
+                    self.limit_y =  self.y
+                if obstacles[0] == VS.END:
+                    self.limit_x = self.x
+                
                 if obstacles[dir] == VS.END and self.direction == 6:
                     self.direction = (self.direction + 4) % 8
                     dir = 0
+                
                 dx, dy = Explorer.AC_INCR[dir]
                 if self.x + dx > 0 or self.y + dy > 0:
                     continue
@@ -217,7 +264,31 @@ class Explorer(AbstAgent):
         rtime_bef = self.get_rtime()
         result = self.walk(dx, dy)
         rtime_aft = self.get_rtime()
-
+        
+        self.pixels_walked += 1
+        
+        if self.quadrante == 0:
+            if self.x > self.max_x:
+                self.max_x = self.x
+            if self.y < self.max_y:
+                self.max_y = self.y
+        elif self.quadrante == 1:
+            if self.x > self.max_x:
+                self.max_x = self.x
+            if self.y > self.max_y:
+                self.max_y = self.y
+        elif self.quadrante == 2:
+            if self.x < self.max_x:
+                self.max_x = self.x
+            if self.y > self.max_y:
+                self.max_y = self.y
+        elif self.quadrante == 3:
+            if self.x < self.max_x:
+                self.max_x = self.x
+            if self.y < self.max_y:
+                self.max_y = self.y
+                
+        self.tam_quad_explored = (abs(self.max_x) + 1) * (abs(self.max_y) + 1)
 
         # Test the result of the walk action
         # Should never bump, but for safe functionning let's test
@@ -265,17 +336,34 @@ class Explorer(AbstAgent):
         dx, dy = self.walk_stack.pop()
         dx = dx * -1
         dy = dy * -1
+        
+        # self.aStar.set_map(self.map)
+        
+        # if self.NAME == "EXPL_1":
+        #     print(f"{self.NAME}: going back to the base, rtime: {self.get_rtime()}")
+        
+        # if self.aStar != None:
+        #     returnPath = self.aStar.search((self.x, self.y), (0, 0))
 
+        # # The first element is the (self.x, self.y), the second is the next position
+        # nextPosition = returnPath[1]
+        
+        # dx = nextPosition[0] - self.x
+        # dy = nextPosition[1] - self.y
+        
+        # if self.NAME == "EXPL_1":
+        #     print(f"{self.NAME}: walking to the base, going to ({self.x+dx}, {self.y+dy}), rtime: {self.get_rtime()}")
+        
         result = self.walk(dx, dy)
+        
         if result == VS.BUMPED:
             print(f"{self.NAME}: when coming back bumped at ({self.x+dx}, {self.y+dy}) , rtime: {self.get_rtime()}")
-            return
-        
-        if result == VS.EXECUTED:
+            
+        elif result == VS.EXECUTED:
             # update the agent's position relative to the origin
             self.x += dx
             self.y += dy
-            #print(f"{self.NAME}: coming back at ({self.x}, {self.y}), rtime: {self.get_rtime()}")
+            
         
     def deliberate(self) -> bool:
         """ The agent chooses the next action. The simulator calls this
@@ -283,15 +371,19 @@ class Explorer(AbstAgent):
 
         # forth and back: go, read the vital signals and come back to the position
 
-        time_tolerance = 2* self.COST_DIAG * Explorer.MAX_DIFFICULTY + self.COST_READ
-
         # keeps exploring while there is enough time
-        if  self.walk_time < (self.get_rtime() - time_tolerance):
-            self.explore()
-            return True
+        if self.get_rtime() > self.return_time:
+            if (self.limit_x == 0 or self.limit_y == 0):
+                self.explore()
+                return True
+            else:
+                self.tam_quad = (abs(self.limit_x) + 1) * (abs(self.limit_y) + 1)
+                if self.pixels_walked < self.tam_quad:
+                    self.explore()
+                    return True                
 
         # no more come back walk actions to execute or already at base
-        if self.walk_stack.is_empty() or (self.x == 0 and self.y == 0):
+        if (self.x == 0 and self.y == 0) or self.walk_stack.is_empty():
             # time to pass the map and found victims to the master rescuer
             self.resc.sync_explorers(self.map, self.victims)
             # finishes the execution of this agent
