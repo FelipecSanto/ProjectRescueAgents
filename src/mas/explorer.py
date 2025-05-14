@@ -53,7 +53,6 @@ class Explorer(AbstAgent):
         self.quadrante = dir - 1
         self.direction = (dir - 1) * 2
         self.lista = []
-        self.finish = False
         self.min = 0, 0
 
         # put the current position - the base - in the map
@@ -81,10 +80,15 @@ class Explorer(AbstAgent):
                 if result is None:
                     # Utiliza o restante da bateria como parametro para aumentar o tamanho do quadrante
                     # Assim, o agente tenta explorar mais depois de terminar o quadrante (ou a área que acreditava ser o quadrante)
-                    battery = round(self.get_rtime()) / 2
+                    battery = round(math.sqrt(self.get_rtime()))
                     if self.quadrante == 0:
                         self.min = self.min[0] - battery, self.min[1] + battery
-                    self.finish = True
+                    if self.quadrante == 1:
+                        self.min = self.min[0] - battery, self.min[1] - battery
+                    if self.quadrante == 2:
+                        self.min = self.min[0] + battery, self.min[1] - battery
+                    if self.quadrante == 3:
+                        self.min = self.min[0] + battery, self.min[1] + battery
                     return (0, 0), False
                 result = result[0] * -1, result[1] * -1
                 return result, False
