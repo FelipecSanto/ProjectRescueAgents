@@ -127,10 +127,7 @@ class Explorer(AbstAgent):
         self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
 
     def get_next_position(self):
-        """ Randomically, gets the next position that can be explored (no wall and inside the grid)
-            There must be at least one CLEAR position in the neighborhood, otherwise it loops forever.
-        """
-        # Check the neighborhood walls and grid limits
+        # Checa obstáculos em volta
         obstacles = self.check_walls_and_lim()
 
         dir = (self.direction + 4) % 8

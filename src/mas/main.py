@@ -27,7 +27,7 @@ def main(data_folder_name, config_ag_folder_name):
 
     # Explorer needs to know rescuer to send the map 
     # that's why rescuer is instatiated before
-    for exp in range(1, 5):
+    for exp in range(1, 2):
         filename = f"explorer_{exp:1d}_config.txt"
         explorer_file = os.path.join(config_ag_folder, filename)
         Explorer(env, explorer_file, master_rescuer, exp)
