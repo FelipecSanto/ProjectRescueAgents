@@ -23,6 +23,8 @@ class Stack:
     def pop(self):
         if not self.is_empty():
             return self.items.pop()
+        else:
+            return None
 
     def is_empty(self):
         return len(self.items) == 0
@@ -48,6 +50,9 @@ class Explorer(AbstAgent):
         self.map = Map()           # create a map for representing the environment
         self.victims = {}          # a dictionary of found victims: (seq): ((x,y), [<vs>])
                                    # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
+        self.quadrante = dir - 1
+        self.direction = (dir - 1) * 2
+        self.lista = LinkedList()
 
         # put the current position - the base - in the map
         self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
@@ -58,18 +63,91 @@ class Explorer(AbstAgent):
         """
         # Check the neighborhood walls and grid limits
         obstacles = self.check_walls_and_lim()
-    
-        # Loop until a CLEAR position is found
+
+        dir = (self.direction + 4) % 8
+
+        cont = 0
+        dx, dy = 0, 0
+
         while True:
-            # Get a random direction
-            direction = random.randint(0, 7)
-            # Check if the corresponding position in walls_and_lim is CLEAR
-            if obstacles[direction] == VS.CLEAR:
-                return Explorer.AC_INCR[direction]
+            cont += 1
+            if cont > 8:
+                result = self.walk_stack.pop()
+                if result is None:
+                    return (0, 0), 1
+                dx, dy = result
+                dx = dx * -1
+                dy = dy * -1
+                result = dx, dy
+                return result, 1
+            if self.quadrante == 0:
+                if self.direction == 0:
+                    dir = (dir + 1) % 8
+                else:
+                    dir = (dir - 1) % 8
+                if self.y == 0 and self.direction == 4:
+                    self.direction = (self.direction + 4) % 8
+                    dir = 2
+                if obstacles[dir] == VS.END and self.direction == 0:
+                    self.direction = (self.direction + 4) % 8
+                    dir = 2
+                dx, dy = Explorer.AC_INCR[dir]
+                if self.x + dx < 0 or self.y + dy > 0:
+                    continue
+            if self.quadrante == 1:
+                if self.direction == 2:
+                    dir = (dir + 1) % 8
+                else:
+                    dir = (dir - 1) % 8
+                if self.x == 0 and self.direction == 6:
+                    self.direction = (self.direction + 4) % 8
+                    dir = 4
+                if obstacles[dir] == VS.END and self.direction == 2:
+                    self.direction = (self.direction + 4) % 8
+                    dir = 4
+                dx, dy = Explorer.AC_INCR[dir]
+                if self.x + dx < 0 or self.y + dy < 0:
+                    continue
+            if self.quadrante == 2:
+                if self.direction == 4:
+                    dir = (dir + 1) % 8
+                else:
+                    dir = (dir - 1) % 8
+                if self.x == 0 and self.direction == 0:
+                    self.direction = (self.direction + 4) % 8
+                    dir = 6
+                if obstacles[dir] == VS.END and self.direction == 4:
+                    self.direction = (self.direction + 4) % 8
+                    dir = 6
+                dx, dy = Explorer.AC_INCR[dir]
+                if self.x + dx > 0 or self.y + dy < 0:
+                    continue
+            if self.quadrante == 3:
+                if self.direction == 6:
+                    dir = (dir + 1) % 8
+                else:
+                    dir = (dir - 1) % 8
+                if self.y == 0 and self.direction == 2:
+                    self.direction = (self.direction + 4) % 8
+                    dir = 0
+                if obstacles[dir] == VS.END and self.direction == 6:
+                    self.direction = (self.direction + 4) % 8
+                    dir = 0
+                dx, dy = Explorer.AC_INCR[dir]
+                if self.x + dx > 0 or self.y + dy > 0:
+                    continue
+            if self.lista.find([self.x + dx, self.y + dy]) is True:
+                continue
+            if obstacles[dir] == VS.CLEAR:
+                self.lista.add([self.x + dx, self.y + dy])
+                return Explorer.AC_INCR[dir], 0
+                
         
     def explore(self):
         # get an random increment for x and y       
-        dx, dy = self.get_next_position()
+        result = self.get_next_position()
+        dx, dy = result[0]
+        back = result[1]
 
         # Moves the body to another position  
         rtime_bef = self.get_rtime()
@@ -87,7 +165,8 @@ class Explorer(AbstAgent):
         if result == VS.EXECUTED:
             # check for victim returns -1 if there is no victim or the sequential
             # the sequential number of a found victim
-            self.walk_stack.push((dx, dy))
+            if back == 0:
+                self.walk_stack.push((dx, dy))
 
             # update the agent's position relative to the origin
             self.x += dx
