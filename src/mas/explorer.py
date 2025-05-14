@@ -29,11 +29,78 @@ class Stack:
     def is_empty(self):
         return len(self.items) == 0
 
+class Node:
+    def __init__(self, data):
+        self.data = data  # data will be of the form [x, y]
+        self.next = None
+
+class LinkedList:
+    def __init__(self):
+        self.head = None
+
+    def add(self, item):
+        """Add a new item to the end of the list."""
+        new_node = Node(item)
+        if not self.head:
+            self.head = new_node
+        else:
+            current = self.head
+            while current.next:
+                current = current.next
+            current.next = new_node
+
+    def remove(self, item):
+        """Remove the first occurrence of the item from the list."""
+        current = self.head
+        prev = None
+        while current:
+            if current.data == item:
+                if prev:
+                    prev.next = current.next
+                else:
+                    self.head = current.next
+                return
+            prev = current
+            current = current.next
+
+    def find(self, item):
+        """Find an item in the list. Returns True if found, False otherwise."""
+        current = self.head
+        while current:
+            if current.data == item:
+                return True
+            current = current.next
+        return False
+
+    def get(self, index):
+        """Get the item at a specific index. Returns None if index is out of bounds."""
+        current = self.head
+        count = 0
+        while current:
+            if count == index:
+                return current.data
+            current = current.next
+            count += 1
+        return None
+
+    def size(self):
+        """Return the size of the list."""
+        count = 0
+        current = self.head
+        while current:
+            count += 1
+            current = current.next
+        return count
+
+    def is_empty(self):
+        """Check if the list is empty."""
+        return self.head is None
+
 class Explorer(AbstAgent):
     """ class attribute """
     MAX_DIFFICULTY = 1             # the maximum degree of difficulty to enter into a cell
     
-    def __init__(self, env, config_file, resc):
+    def __init__(self, env, config_file, resc, dir):
         """ Construtor do agente random on-line
         @param env: a reference to the environment 
         @param config_file: the absolute path to the explorer's config file
