@@ -26,12 +26,15 @@ class Stack:
 
     def is_empty(self):
         return len(self.items) == 0
+    
+    def belongs(self, item):
+        return item in self.items
 
 class Explorer(AbstAgent):
     """ class attribute """
     MAX_DIFFICULTY = 1             # the maximum degree of difficulty to enter into a cell
     
-    def __init__(self, env, config_file, resc):
+    def __init__(self, env, config_file, resc, direction):
         """ Construtor do agente random on-line
         @param env: a reference to the environment 
         @param config_file: the absolute path to the explorer's config file
@@ -48,24 +51,33 @@ class Explorer(AbstAgent):
         self.map = Map()           # create a map for representing the environment
         self.victims = {}          # a dictionary of found victims: (seq): ((x,y), [<vs>])
                                    # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
+        self.direction = direction
+        self.direction_dist = 0
+        self.diagonal_dist = 0
+        self.diagonal_flag = 1
 
         # put the current position - the base - in the map
         self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
 
     def get_next_position(self):
-        """ Randomically, gets the next position that can be explored (no wall and inside the grid)
-            There must be at least one CLEAR position in the neighborhood, otherwise it loops forever.
-        """
-        # Check the neighborhood walls and grid limits
+        
         obstacles = self.check_walls_and_lim()
-    
-        # Loop until a CLEAR position is found
-        while True:
-            # Get a random direction
-            direction = random.randint(0, 7)
-            # Check if the corresponding position in walls_and_lim is CLEAR
-            if obstacles[direction] == VS.CLEAR:
-                return Explorer.AC_INCR[direction]
+        
+        dir = self.direction
+
+        if self.direction_dist <= abs(self.diagonal_dist) and obstacles[dir] == VS.CLEAR:
+            self.direction_dist += 1
+        else:
+            dir = (dir + self.diagonal_flag * 2) % 8
+            if obstacles[dir] != VS.CLEAR:
+                self.diagonal_flag = self.diagonal_flag * -1
+                dir = (dir + self.diagonal_flag * 4) % 8
+            if obstacles[dir] == VS.CLEAR:
+                self.diagonal_dist += self.diagonal_flag
+                if self.direction_dist <= abs(self.diagonal_dist):
+                    self.diagonal_flag = self.diagonal_flag * -1
+            
+        return Explorer.AC_INCR[dir]
         
     def explore(self):
         # get an random increment for x and y       
