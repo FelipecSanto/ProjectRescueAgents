@@ -139,7 +139,7 @@ class Explorer(AbstAgent):
             dir = (dir + 1) % 8
             dx, dy = Explorer.AC_INCR[dir]
             if obstacles[dir] == VS.END:
-                self.max = self.caminho * dx, self. * dy
+                self.max = self.caminho * dx, self.y * dy
                 continue
             if self.quadrante == 0 and (self.x + dx < 0 or self.y + dy < 0):
                 self.direction = (self.direction + 1) % 8

@@ -37,7 +37,6 @@ from vs.constants import VS
 class Map:
     def __init__(self):
         self.data = {}
-
     
     def in_map(self, coord):
         if coord in self.data:
