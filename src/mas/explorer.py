@@ -29,73 +29,6 @@ class Stack:
     def is_empty(self):
         return len(self.items) == 0
 
-class Node:
-    def __init__(self, data):
-        self.data = data  # data will be of the form [x, y]
-        self.next = None
-
-class LinkedList:
-    def __init__(self):
-        self.head = None
-
-    def add(self, item):
-        """Add a new item to the end of the list."""
-        new_node = Node(item)
-        if not self.head:
-            self.head = new_node
-        else:
-            current = self.head
-            while current.next:
-                current = current.next
-            current.next = new_node
-
-    def remove(self, item):
-        """Remove the first occurrence of the item from the list."""
-        current = self.head
-        prev = None
-        while current:
-            if current.data == item:
-                if prev:
-                    prev.next = current.next
-                else:
-                    self.head = current.next
-                return
-            prev = current
-            current = current.next
-
-    def find(self, item):
-        """Find an item in the list. Returns True if found, False otherwise."""
-        current = self.head
-        while current:
-            if current.data == item:
-                return True
-            current = current.next
-        return False
-
-    def get(self, index):
-        """Get the item at a specific index. Returns None if index is out of bounds."""
-        current = self.head
-        count = 0
-        while current:
-            if count == index:
-                return current.data
-            current = current.next
-            count += 1
-        return None
-
-    def size(self):
-        """Return the size of the list."""
-        count = 0
-        current = self.head
-        while current:
-            count += 1
-            current = current.next
-        return count
-
-    def is_empty(self):
-        """Check if the list is empty."""
-        return self.head is None
-
 class Explorer(AbstAgent):
     """ class attribute """
     MAX_DIFFICULTY = 1             # the maximum degree of difficulty to enter into a cell
@@ -119,7 +52,7 @@ class Explorer(AbstAgent):
                                    # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
         self.quadrante = dir - 1
         self.direction = (dir - 1) * 2
-        self.lista = LinkedList()
+        self.lista = []
         #self.finish = False
         self.min = 0, 0
 
@@ -211,12 +144,12 @@ class Explorer(AbstAgent):
                     continue
             
             # Verifica se a posição já foi visitada
-            if self.lista.find([self.x + dx, self.y + dy]) is True:
+            if ((self.x + dx, self.y + dy)) in self.lista:
                 continue
 
             # Verifica se o movimento é possível
             if obstacles[dir] == VS.CLEAR:
-                self.lista.add([self.x + dx, self.y + dy])
+                self.lista.append((self.x + dx, self.y + dy))
                 return Explorer.AC_INCR[dir], True
                 
         
