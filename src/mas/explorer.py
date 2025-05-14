@@ -53,7 +53,7 @@ class Explorer(AbstAgent):
         self.quadrante = dir - 1
         self.direction = (dir - 1) * 2
         self.lista = []
-        #self.finish = False
+        self.finish = False
         self.min = 0, 0
 
         # put the current position - the base - in the map
@@ -79,66 +79,77 @@ class Explorer(AbstAgent):
             if cont > 8:
                 result = self.walk_stack.pop()
                 if result is None:
-                    #if self.quadrante == 0:
-                    #    self.min = self.min[0] - 1, self.min[1] + 1
+                    # Utiliza o restante da bateria como parametro para aumentar o tamanho do quadrante
+                    # Assim, o agente tenta explorar mais depois de terminar o quadrante (ou a área que acreditava ser o quadrante)
+                    battery = round(self.get_rtime()) / 2
+                    if self.quadrante == 0:
+                        self.min = self.min[0] - battery, self.min[1] + battery
+                    self.finish = True
                     return (0, 0), False
                 result = result[0] * -1, result[1] * -1
                 return result, False
             
             # Verifica as direções e condições para cada quadrante
             if self.quadrante == 0:
+                # Comentários apenas para o primeiro quadrante, já que os outros são semelhantes
+                # Se a direção for a inicial, gira para a horário, senão gira para anti-horário
+                # Isso porque depende se ele está indo ou voltando, e isso ajuda a sempre preencher onde está faltando
                 if self.direction == 0:
                     dir = (dir + 1) % 8
                 else:
                     dir = (dir - 1) % 8
-                if self.y == 0 and self.direction == 4:
+                # Se estiver no mínimo da direção, troca ela
+                if self.y == self.min[1] and self.direction == 4:
                     self.direction = (self.direction + 4) % 8
                 if obstacles[dir] == VS.END and self.direction == 0:
                     if dir >= 0 and dir <= 1:
                         self.direction = (self.direction + 4) % 8
+                        dir = 2
                 dx, dy = Explorer.AC_INCR[dir]
                 if self.x + dx < self.min[0] or self.y + dy > self.min[1]:
                     continue
             
-            if self.quadrante == 1:
+            elif self.quadrante == 1:
                 if self.direction == 2:
                     dir = (dir + 1) % 8
                 else:
                     dir = (dir - 1) % 8
-                if self.x == 0 and self.direction == 6:
+                if self.x == self.min[0] and self.direction == 6:
                     self.direction = (self.direction + 4) % 8
-                    dir = 4
                 if obstacles[dir] == VS.END and self.direction == 2:
                     if dir >= 2 and dir <= 3:
                         self.direction = (self.direction + 4) % 8
+                        dir = 4
                 dx, dy = Explorer.AC_INCR[dir]
                 if self.x + dx < self.min[0] or self.y + dy < self.min[1]:
                     continue
             
-            if self.quadrante == 2:
+            elif self.quadrante == 2:
                 if self.direction == 4:
                     dir = (dir + 1) % 8
                 else:
                     dir = (dir - 1) % 8
-                if self.x == 0 and self.direction == 0:
+                if self.y == self.min[1] and self.direction == 0:
                     self.direction = (self.direction + 4) % 8
                 if obstacles[dir] == VS.END and self.direction == 4:
                     if dir >= 4 and dir <= 5:
                         self.direction = (self.direction + 4) % 8
+                        dir = 6
                 dx, dy = Explorer.AC_INCR[dir]
                 if self.x + dx > self.min[0] or self.y + dy < self.min[1]:
                     continue
             
-            if self.quadrante == 3:
+            else:
                 if self.direction == 6:
                     dir = (dir + 1) % 8
                 else:
                     dir = (dir - 1) % 8
-                if self.y == 0 and self.direction == 2:
+                if self.x == self.min[0] and self.direction == 2:
                     self.direction = (self.direction + 4) % 8
                 if obstacles[dir] == VS.END and self.direction == 6:
                     if dir >= 6 and dir <= 7:
                         self.direction = (self.direction + 4) % 8
+                        dir = 0
                 dx, dy = Explorer.AC_INCR[dir]
                 if self.x + dx > self.min[0] or self.y + dy > self.min[1]:
                     continue
