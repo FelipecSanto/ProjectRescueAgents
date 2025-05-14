@@ -120,6 +120,8 @@ class Explorer(AbstAgent):
         self.quadrante = dir - 1
         self.direction = (dir - 1) * 2
         self.lista = LinkedList()
+        #self.finish = False
+        self.min = 0, 0
 
         # put the current position - the base - in the map
         self.map.add((self.x, self.y), 1, VS.NO_VICTIM, self.check_walls_and_lim())
@@ -141,12 +143,11 @@ class Explorer(AbstAgent):
             if cont > 8:
                 result = self.walk_stack.pop()
                 if result is None:
-                    return (0, 0), 1
-                dx, dy = result
-                dx = dx * -1
-                dy = dy * -1
-                result = dx, dy
-                return result, 1
+                    if self.quadrante == 0:
+                        self.min = self.min[0] - 1, self.min[1] + 1
+                    return (0, 0), False
+                result = result[0] * -1, result[1] * -1
+                return result, False
             if self.quadrante == 0:
                 if self.direction == 0:
                     dir = (dir + 1) % 8
@@ -159,7 +160,7 @@ class Explorer(AbstAgent):
                     self.direction = (self.direction + 4) % 8
                     dir = 2
                 dx, dy = Explorer.AC_INCR[dir]
-                if self.x + dx < 0 or self.y + dy > 0:
+                if self.x + dx < self.min[0] or self.y + dy > self.min[1]:
                     continue
             if self.quadrante == 1:
                 if self.direction == 2:
@@ -173,7 +174,7 @@ class Explorer(AbstAgent):
                     self.direction = (self.direction + 4) % 8
                     dir = 4
                 dx, dy = Explorer.AC_INCR[dir]
-                if self.x + dx < 0 or self.y + dy < 0:
+                if self.x + dx < self.min[0] or self.y + dy < self.min[1]:
                     continue
             if self.quadrante == 2:
                 if self.direction == 4:
@@ -187,7 +188,7 @@ class Explorer(AbstAgent):
                     self.direction = (self.direction + 4) % 8
                     dir = 6
                 dx, dy = Explorer.AC_INCR[dir]
-                if self.x + dx > 0 or self.y + dy < 0:
+                if self.x + dx > self.min[0] or self.y + dy < self.min[1]:
                     continue
             if self.quadrante == 3:
                 if self.direction == 6:
@@ -201,13 +202,13 @@ class Explorer(AbstAgent):
                     self.direction = (self.direction + 4) % 8
                     dir = 0
                 dx, dy = Explorer.AC_INCR[dir]
-                if self.x + dx > 0 or self.y + dy > 0:
+                if self.x + dx > self.min[0] or self.y + dy > self.min[1]:
                     continue
             if self.lista.find([self.x + dx, self.y + dy]) is True:
                 continue
             if obstacles[dir] == VS.CLEAR:
                 self.lista.add([self.x + dx, self.y + dy])
-                return Explorer.AC_INCR[dir], 0
+                return Explorer.AC_INCR[dir], True
                 
         
     def explore(self):
@@ -232,7 +233,7 @@ class Explorer(AbstAgent):
         if result == VS.EXECUTED:
             # check for victim returns -1 if there is no victim or the sequential
             # the sequential number of a found victim
-            if back == 0:
+            if back:
                 self.walk_stack.push((dx, dy))
 
             # update the agent's position relative to the origin
