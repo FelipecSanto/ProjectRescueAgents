@@ -9,6 +9,7 @@ import os
 import random
 import math
 from abc import ABC, abstractmethod
+from comeBack import ComeBack
 from vs.abstract_agent import AbstAgent
 from vs.constants import VS
 from map import Map
@@ -123,8 +124,9 @@ class Explorer(AbstAgent):
         self.lista = LinkedList()
         self.return_time = 0
         
-        self.aStar = Astar(self.map, self)
-        
+        #self.aStar = Astar(self.map, self)
+        self.comeBack = ComeBack()
+
         self.max_x = 0
         self.max_y = 0
         self.tam_quad_explored = 0
@@ -336,7 +338,7 @@ class Explorer(AbstAgent):
                 self.max_Difficulty = difficulty
 
             # Atualiza tempo de retorno
-            self.return_time = Astar.heuristic(self.aStar, (self.x, self.y), (0, 0))
+            self.return_time = self.comeBack.heuristic((self.x, self.y), difficulty)
 
         return
 
@@ -344,8 +346,6 @@ class Explorer(AbstAgent):
         dx, dy = self.walk_stack.pop()
         dx = dx * -1
         dy = dy * -1
-        
-        self.aStar.set_map(self.map)
 
         if self.NAME == "EXPL_1":
             print(f"{self.NAME}: going back to the base, rtime: {self.get_rtime()}")
