@@ -1,4 +1,5 @@
 import heapq
+from vs.abstract_agent import AbstAgent
 
 class Node:
     def __init__(self, position, parent=None, g=0, h=0):
@@ -40,8 +41,6 @@ class Astar:
         
         # Valor da heurística inicial
         difficulty = 0
-        
-        side = 0
         
         # Calcula os catetos do triângulo retângulo formado pelos pontos de início e fim
         deltaX = x1 - x0
@@ -87,135 +86,23 @@ class Astar:
                 else:
                     dy = 0
             else:
+                dir = 0
                 match dx, dy:
-                    case 0, -1:
-                        match side:
-                            case 0:
-                                dx, dy = 1, -1
-                            case 1:
-                                dx, dy = -1, -1
-                            case 2:
-                                dx, dy = 1, 0
-                            case 3:
-                                dx, dy = -1, 0
-                            case 4:
-                                dx, dy = 1, 1
-                            case 5:
-                                dx, dy = -1, 1
-                            case 6:
-                                dx, dy = 0, 1
                     case 1, -1:
-                        match side:
-                            case 0:
-                                dx, dy = 1, 0
-                            case 1:
-                                dx, dy = 0, -1
-                            case 2:
-                                dx, dy = 1, 1
-                            case 3:
-                                dx, dy = -1, -1
-                            case 4:
-                                dx, dy = 0, 1
-                            case 5:
-                                dx, dy = -1, 0
-                            case 6:
-                                dx, dy = 1, -1
+                        dir = 1
                     case 1, 0:
-                        match side:
-                            case 0:
-                                dx, dy = 1, 1
-                            case 1:
-                                dx, dy = 1, -1
-                            case 2:
-                                dx, dy = 0, 1
-                            case 3:
-                                dx, dy = 0, -1
-                            case 4:
-                                dx, dy = -1, 1
-                            case 5:
-                                dx, dy = -1, -1
-                            case 6:
-                                dx, dy = -1, 0
+                        dir = 2
                     case 1, 1:
-                        match side:
-                            case 0:
-                                dx, dy = 0, 1
-                            case 1:
-                                dx, dy = 1, 0
-                            case 2:
-                                dx, dy = -1, 1
-                            case 3:
-                                dx, dy = 1, -1
-                            case 4:
-                                dx, dy = -1, 0
-                            case 5:
-                                dx, dy = 0, -1
-                            case 6:
-                                dx, dy = -1, -1
+                        dir = 3
                     case 0, 1:
-                        match side:
-                            case 0:
-                                dx, dy = -1, 1
-                            case 1:
-                                dx, dy = 1, 1
-                            case 2:
-                                dx, dy = -1, 0
-                            case 3:
-                                dx, dy = 1, 0
-                            case 4:
-                                dx, dy = -1, -1
-                            case 5:
-                                dx, dy = 1, -1
-                            case 6:
-                                dx, dy = 0, -1
+                        dir = 4
                     case -1, 1:
-                        match side:
-                            case 0:
-                                dx, dy = -1, 0
-                            case 1:
-                                dx, dy = 0, 1
-                            case 2:
-                                dx, dy = -1, -1
-                            case 3:
-                                dx, dy = 1, 1
-                            case 4:
-                                dx, dy = 0, -1
-                            case 5:
-                                dx, dy = 1, 0
-                            case 6:
-                                dx, dy = 1, -1
+                        dir = 5
                     case -1, 0:
-                        match side:
-                            case 0:
-                                dx, dy = -1, -1
-                            case 1:
-                                dx, dy = -1, 1
-                            case 2:
-                                dx, dy = 0, -1
-                            case 3:
-                                dx, dy = 0, 1
-                            case 4:
-                                dx, dy = 1, -1
-                            case 5:
-                                dx, dy = 1, 1
-                            case 6:
-                                dx, dy = 1, 0
+                        dir = 6
                     case -1, -1:
-                        match side:
-                            case 0:
-                                dx, dy = 0, -1
-                            case 1:
-                                dx, dy = -1, 0
-                            case 2:
-                                dx, dy = 1, -1
-                            case 3:
-                                dx, dy = -1, 1
-                            case 4:
-                                dx, dy = 1, 0
-                            case 5:
-                                dx, dy = 0, 1
-                            case 6:
-                                dx, dy = 1, 1
+                        dir = 7
+                dx, dy = AbstAgent.AC_INCR[dir]
         
         return difficulty
     
