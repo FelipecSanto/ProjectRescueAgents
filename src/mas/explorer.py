@@ -31,73 +31,6 @@ class Stack:
     def is_empty(self):
         return len(self.items) == 0
 
-class Node:
-    def __init__(self, data):
-        self.data = data  # data will be of the form [x, y]
-        self.next = None
-
-class LinkedList:
-    def __init__(self):
-        self.head = None
-
-    def add(self, item):
-        """Add a new item to the end of the list."""
-        new_node = Node(item)
-        if not self.head:
-            self.head = new_node
-        else:
-            current = self.head
-            while current.next:
-                current = current.next
-            current.next = new_node
-
-    def remove(self, item):
-        """Remove the first occurrence of the item from the list."""
-        current = self.head
-        prev = None
-        while current:
-            if current.data == item:
-                if prev:
-                    prev.next = current.next
-                else:
-                    self.head = current.next
-                return
-            prev = current
-            current = current.next
-
-    def find(self, item):
-        """Find an item in the list. Returns True if found, False otherwise."""
-        current = self.head
-        while current:
-            if current.data == item:
-                return True
-            current = current.next
-        return False
-
-    def get(self, index):
-        """Get the item at a specific index. Returns None if index is out of bounds."""
-        current = self.head
-        count = 0
-        while current:
-            if count == index:
-                return current.data
-            current = current.next
-            count += 1
-        return None
-
-    def size(self):
-        """Return the size of the list."""
-        count = 0
-        current = self.head
-        while current:
-            count += 1
-            current = current.next
-        return count
-
-    def is_empty(self):
-        """Check if the list is empty."""
-        return self.head is None
-
 class Explorer(AbstAgent):
     """ class attribute """
     MAX_DIFFICULTY = 1             # the maximum degree of difficulty to enter into a cell
@@ -121,7 +54,8 @@ class Explorer(AbstAgent):
                                    # the key is the seq number of the victim,(x,y) the position, <vs> the list of vital signals
         self.quadrante = dir - 1
         self.direction = (dir - 1) * 2
-        self.lista = LinkedList()
+        self.lista = []
+        self.min = 0, 0
         self.return_time = 0
         
         self.aStar = Astar(self.map, self)
@@ -144,83 +78,110 @@ class Explorer(AbstAgent):
         # Checa obstáculos em volta
         obstacles = self.check_walls_and_lim()
 
+        # Direção inicial, baseado no quadrante
         dir = (self.direction + 4) % 8
 
+        # Contador para evitar loops infinitos
         cont = 0
+        # Inicializa dx e dy (direções que o agente vai andar)
         dx, dy = 0, 0
 
         while True:
             cont += 1
+            # Se o contador for maior que 8, significa que não há mais direções disponíveis
+            # O agente tentará voltar pela pilha de movimentos
+            # Ele ainda verificará se há alguma direção válida enquanto estiver voltando, e se houver, ele irá nessa direção
             if cont > 8:
                 result = self.walk_stack.pop()
                 if result is None:
-                    return (0, 0), 1
-                dx, dy = result
-                dx = dx * -1
-                dy = dy * -1
-                result = dx, dy
-                return result, 1
+                    # Utiliza o restante da bateria como parametro para aumentar o tamanho do quadrante
+                    # Assim, o agente tenta explorar mais depois de terminar o quadrante (ou a área que acreditava ser o quadrante)
+                    battery = round(math.sqrt(self.get_rtime()))
+                    if self.quadrante == 0:
+                        self.min = self.min[0] - battery, self.min[1] + battery
+                    if self.quadrante == 1:
+                        self.min = self.min[0] - battery, self.min[1] - battery
+                    if self.quadrante == 2:
+                        self.min = self.min[0] + battery, self.min[1] - battery
+                    if self.quadrante == 3:
+                        self.min = self.min[0] + battery, self.min[1] + battery
+                    return (0, 0), False
+                result = result[0] * -1, result[1] * -1
+                return result, False
+            
+            # Verifica as direções e condições para cada quadrante
             if self.quadrante == 0:
+                # Comentários apenas para o primeiro quadrante, já que os outros são semelhantes
+                # Se a direção for a inicial, gira para a horário, senão gira para anti-horário
+                # Isso porque depende se ele está indo ou voltando, e isso ajuda a sempre preencher onde está faltando
                 if self.direction == 0:
                     dir = (dir + 1) % 8
                 else:
                     dir = (dir - 1) % 8
-                if self.y == 0 and self.direction == 4:
+                # Se estiver no mínimo da direção, troca ela
+                if self.y == self.min[1] and self.direction == 4:
                     self.direction = (self.direction + 4) % 8
-                    dir = 2
-                if obstacles[dir] == VS.END and self.direction == 0:    
-                    self.direction = (self.direction + 4) % 8
-                    dir = 2
+                if obstacles[dir] == VS.END and self.direction == 0:
+                    if dir >= 0 and dir <= 1:
+                        self.direction = (self.direction + 4) % 8
+                        dir = 2
                 dx, dy = Explorer.AC_INCR[dir]
-                if self.x + dx < 0 or self.y + dy > 0:
+                if self.x + dx < self.min[0] or self.y + dy > self.min[1]:
                     continue
-            if self.quadrante == 1:
+            
+            elif self.quadrante == 1:
                 if self.direction == 2:
                     dir = (dir + 1) % 8
                 else:
                     dir = (dir - 1) % 8
-                if self.x == 0 and self.direction == 6:
+                if self.x == self.min[0] and self.direction == 6:
                     self.direction = (self.direction + 4) % 8
-                    dir = 4
                 if obstacles[dir] == VS.END and self.direction == 2:
-                    self.direction = (self.direction + 4) % 8
-                    dir = 4
+                    if dir >= 2 and dir <= 3:
+                        self.direction = (self.direction + 4) % 8
+                        dir = 4
                 dx, dy = Explorer.AC_INCR[dir]
-                if self.x + dx < 0 or self.y + dy < 0:
+                if self.x + dx < self.min[0] or self.y + dy < self.min[1]:
                     continue
-            if self.quadrante == 2:
+            
+            elif self.quadrante == 2:
                 if self.direction == 4:
                     dir = (dir + 1) % 8
                 else:
                     dir = (dir - 1) % 8
-                if self.x == 0 and self.direction == 0:
+                if self.y == self.min[1] and self.direction == 0:
                     self.direction = (self.direction + 4) % 8
-                    dir = 6
                 if obstacles[dir] == VS.END and self.direction == 4:
-                    self.direction = (self.direction + 4) % 8
-                    dir = 6
+                    if dir >= 4 and dir <= 5:
+                        self.direction = (self.direction + 4) % 8
+                        dir = 6
                 dx, dy = Explorer.AC_INCR[dir]
-                if self.x + dx > 0 or self.y + dy < 0:
+                if self.x + dx > self.min[0] or self.y + dy < self.min[1]:
                     continue
-            if self.quadrante == 3:
+            
+            else:
                 if self.direction == 6:
                     dir = (dir + 1) % 8
                 else:
                     dir = (dir - 1) % 8
-                if self.y == 0 and self.direction == 2:
+                if self.x == self.min[0] and self.direction == 2:
                     self.direction = (self.direction + 4) % 8
-                    dir = 0
                 if obstacles[dir] == VS.END and self.direction == 6:
-                    self.direction = (self.direction + 4) % 8
-                    dir = 0
+                    if dir >= 6 and dir <= 7:
+                        self.direction = (self.direction + 4) % 8
+                        dir = 0
                 dx, dy = Explorer.AC_INCR[dir]
-                if self.x + dx > 0 or self.y + dy > 0:
+                if self.x + dx > self.min[0] or self.y + dy > self.min[1]:
                     continue
-            if self.lista.find([self.x + dx, self.y + dy]) is True:
+            
+            # Verifica se a posição já foi visitada
+            if ((self.x + dx, self.y + dy)) in self.lista:
                 continue
+
+            # Verifica se o movimento é possível
             if obstacles[dir] == VS.CLEAR:
-                self.lista.add([self.x + dx, self.y + dy])
-                return Explorer.AC_INCR[dir], 0
+                self.lista.append((self.x + dx, self.y + dy))
+                return Explorer.AC_INCR[dir], True
                 
         
     def explore(self):
@@ -244,7 +205,7 @@ class Explorer(AbstAgent):
         if result == VS.EXECUTED:
             # check for victim returns -1 if there is no victim or the sequential
             # the sequential number of a found victim
-            if back == 0:
+            if back:
                 self.walk_stack.push((dx, dy))
 
             # update the agent's position relative to the origin
