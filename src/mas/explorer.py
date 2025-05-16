@@ -263,7 +263,11 @@ class Explorer(AbstAgent):
         # The first element is the (self.x, self.y), the second is the next position
         nextPosition = self.return_path[self.it_return_path][0]
         
-        self.it_return_path += 1
+        if self.it_return_path <= len(self.return_path) - 1:
+            self.it_return_path += 1
+        else:
+            self.it_return_path = 1
+            self.last_path = True
 
         dx = nextPosition[0] - self.x
         dy = nextPosition[1] - self.y
