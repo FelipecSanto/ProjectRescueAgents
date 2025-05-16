@@ -27,13 +27,16 @@ def main(data_folder_name, config_ag_folder_name):
 
     # Explorer needs to know rescuer to send the map 
     # that's why rescuer is instatiated before
-    for exp in range(4, 5):
+    for exp in range(1, 5):
         filename = f"explorer_{exp:1d}_config.txt"
         explorer_file = os.path.join(config_ag_folder, filename)
         Explorer(env, explorer_file, master_rescuer, exp)
 
     # Run the environment simulator
     env.run()
+    
+    env.print_results()
+    env.print_acum_results()
     
         
 if __name__ == '__main__':
@@ -43,7 +46,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         data_folder_name = sys.argv[1]
     else:
-        data_folder_name = os.path.join("datasets", "data_225v_100x80")
+        data_folder_name = os.path.join("datasets", "data_430v_94x94")
         config_ag_folder_name = os.path.join("src", "cfg_1")
         
     main(data_folder_name, config_ag_folder_name)

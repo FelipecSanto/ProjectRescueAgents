@@ -204,53 +204,53 @@ class Rescuer(AbstAgent):
 
         if self.received_maps == self.nb_of_explorers:
             print(f"{self.NAME} all maps received from the explorers")
-            #self.map.draw()
-            #print(f"{self.NAME} found victims by all explorers:\n{self.victims}")
+            # #self.map.draw()
+            # #print(f"{self.NAME} found victims by all explorers:\n{self.victims}")
 
-            #@TODO predict the severity and the class of victims' using a classifier
-            self.predict_severity_and_class()
+            # #@TODO predict the severity and the class of victims' using a classifier
+            # self.predict_severity_and_class()
 
-            #@TODO cluster the victims possibly using the severity and other criteria
-            # Here, there 4 clusters
-            clusters_of_vic = self.cluster_victims()
+            # #@TODO cluster the victims possibly using the severity and other criteria
+            # # Here, there 4 clusters
+            # clusters_of_vic = self.cluster_victims()
 
-            for i, cluster in enumerate(clusters_of_vic):
-                self.save_cluster_csv(cluster, i+1)    # file names start at 1
+            # for i, cluster in enumerate(clusters_of_vic):
+            #     self.save_cluster_csv(cluster, i+1)    # file names start at 1
   
-            # Instantiate the other rescuers
-            rescuers = [None] * 4
-            rescuers[0] = self                    # the master rescuer is the index 0 agent
+            # # Instantiate the other rescuers
+            # rescuers = [None] * 4
+            # rescuers[0] = self                    # the master rescuer is the index 0 agent
 
-            # Assign the cluster the master agent is in charge of 
-            self.clusters = [clusters_of_vic[0]]  # the first one
+            # # Assign the cluster the master agent is in charge of 
+            # self.clusters = [clusters_of_vic[0]]  # the first one
 
-            # Instantiate the other rescuers and assign the clusters to them
-            for i in range(1, 4):    
-                #print(f"{self.NAME} instantianting rescuer {i+1}, {self.get_env()}")
-                filename = f"rescuer_{i+1:1d}_config.txt"
-                config_file = os.path.join(self.config_folder, filename)
-                # each rescuer receives one cluster of victims
-                rescuers[i] = Rescuer(self.get_env(), config_file, 4, [clusters_of_vic[i]]) 
-                rescuers[i].map = self.map     # each rescuer have the map
+            # # Instantiate the other rescuers and assign the clusters to them
+            # for i in range(1, 4):    
+            #     #print(f"{self.NAME} instantianting rescuer {i+1}, {self.get_env()}")
+            #     filename = f"rescuer_{i+1:1d}_config.txt"
+            #     config_file = os.path.join(self.config_folder, filename)
+            #     # each rescuer receives one cluster of victims
+            #     rescuers[i] = Rescuer(self.get_env(), config_file, 4, [clusters_of_vic[i]]) 
+            #     rescuers[i].map = self.map     # each rescuer have the map
 
             
-            # Calculate the sequence of rescue for each agent
-            # In this case, each agent has just one cluster and one sequence
-            self.sequences = self.clusters         
+            # # Calculate the sequence of rescue for each agent
+            # # In this case, each agent has just one cluster and one sequence
+            # self.sequences = self.clusters         
 
-            # For each rescuer, we calculate the rescue sequence 
-            for i, rescuer in enumerate(rescuers):
-                rescuer.sequencing()         # the sequencing will reorder the cluster
+            # # For each rescuer, we calculate the rescue sequence 
+            # for i, rescuer in enumerate(rescuers):
+            #     rescuer.sequencing()         # the sequencing will reorder the cluster
                 
-                for j, sequence in enumerate(rescuer.sequences):
-                    if j == 0:
-                        self.save_sequence_csv(sequence, i+1)              # primeira sequencia do 1o. cluster 1: seq1 
-                    else:
-                        self.save_sequence_csv(sequence, (i+1)+ j*10)      # demais sequencias do 1o. cluster: seq11, seq12, seq13, ...
+            #     for j, sequence in enumerate(rescuer.sequences):
+            #         if j == 0:
+            #             self.save_sequence_csv(sequence, i+1)              # primeira sequencia do 1o. cluster 1: seq1 
+            #         else:
+            #             self.save_sequence_csv(sequence, (i+1)+ j*10)      # demais sequencias do 1o. cluster: seq11, seq12, seq13, ...
 
             
-                rescuer.planner()            # make the plan for the trajectory
-                rescuer.set_state(VS.ACTIVE) # from now, the simulator calls the deliberation method 
+            #     rescuer.planner()            # make the plan for the trajectory
+            #     rescuer.set_state(VS.ACTIVE) # from now, the simulator calls the deliberation method 
          
         
     def deliberate(self) -> bool:

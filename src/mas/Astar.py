@@ -23,6 +23,7 @@ class Astar:
         self.explorer = explorer
         self.cost_line = cost_line
         self.cost_diag = cost_diag
+        self.mapReturn = {}
         
     def set_map(self, map_obj):
         """
@@ -30,83 +31,59 @@ class Astar:
         map_obj: instância de Map preenchida pelo Explorer
         """
         self.map = map_obj
-
-    def heuristic(self, start, end):
+        
+    def get_min_neighbor(self, pos):
+        """
+        Retorna a célula vizinha com menor custo.
+        Se não houver vizinhos, retorna None.
+        """
+        neighbors = self.get_neighbors(pos)
+        if not neighbors:
+            return None
+        return min(neighbors, key=lambda x: x[1])
+        
+    def set_difficulty(self, position, difficulty):
         """
         Heurística adaptada para mapas parcialmente conhecidos.
         Se houver obstáculos conhecidos no caminho direto, penaliza a heurística.
         """
+        x, y = position
+
+        # Primeiro calcula a dificuldade baseado no menor vizinho
+        min_neighbor = self.get_min_neighbor((x, y))
+        dif = min_neighbor[1] + difficulty
+        result = dif
+        if (x, y) in self.mapReturn and self.mapReturn[(x, y)][0] < dif:
+            result = self.mapReturn[(x, y)][0]
+            
+        self.mapReturn[(x, y)] = [result, min_neighbor[0]]
+
+    def heuristic(self, start, end):
+        """
+        Heuristic based on the Euclidean distance multiplied by the average difficulty of known cells.
+        This approximates the real cost of returning to the base considering the already explored terrain.
+        """
         x0, y0 = start
         x1, y1 = end
-        
-        # Valor da heurística inicial
-        difficulty = 0
-        
-        # Calcula os catetos do triângulo retângulo formado pelos pontos de início e fim
-        deltaX = x1 - x0
-        deltaY = y1 - y0
-        
-        # Calcula a direção do movimento
-        if deltaX != 0:
-            dx = deltaX/abs(deltaX)
-        else:
-            dx = 0
-        if deltaY != 0:
-            dy = deltaY/abs(deltaY)
-        else:
-            dy = 0
-            
-        # Inicia a posição corrente
-        x = x0
-        y = y0
-        
-        # Enquanto não chegar ao destino, calcula a dificuldade até o destino
-        while (x, y) != (x1, y1):
-            pos_x = x + dx
-            pos_y = y + dy
-            data_pos = self.map.get((pos_x, pos_y))
-            if data_pos is not None:
-                
-                # Soma quanto vai custar para andar até a célula
-                if dx != 0 and dy != 0:
-                    difficulty += data_pos[0]*self.cost_diag
-                else:
-                    difficulty += data_pos[0]*self.cost_line
-                
-                # Atualiza a posição corrente e a direção do movimento
-                x, y = pos_x, pos_y
-                deltaX = x1 - pos_x
-                deltaY = y1 - pos_y
-                if deltaX != 0:
-                    dx = deltaX/abs(deltaX)
-                else:
-                    dx = 0
-                if deltaY != 0:
-                    dy = deltaY/abs(deltaY)
-                else:
-                    dy = 0
-            else:
-                dir = 0
-                match dx, dy:
-                    case 1, -1:
-                        dir = 1
-                    case 1, 0:
-                        dir = 2
-                    case 1, 1:
-                        dir = 3
-                    case 0, 1:
-                        dir = 4
-                    case -1, 1:
-                        dir = 5
-                    case -1, 0:
-                        dir = 6
-                    case -1, -1:
-                        dir = 7
-                dx, dy = AbstAgent.AC_INCR[dir]
-        
-        return difficulty
-    
 
+        # Euclidean distance (allows diagonals)
+        dist = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5
+
+        # Calculate the average difficulty of known cells (excluding obstacles)
+        difficulties = []
+        for pos in self.map.data:
+            difficulty = self.map.get_difficulty(pos)
+            if difficulty is not None and difficulty < 100:  # 100 = impassable obstacle
+                difficulties.append(difficulty)
+        if difficulties:
+            avg_difficulty = sum(difficulties) / len(difficulties)
+        else:
+            avg_difficulty = 1  # default if no data
+
+        return dist * avg_difficulty
+        
+        
+    
     def get_neighbors(self, pos):
         # 8 direções: ortogonais e diagonais
         directions = [(-1,0), (1,0), (0,-1), (0,1), (-1,-1), (-1,1), (1,-1), (1,1)]
@@ -127,8 +104,7 @@ class Astar:
         Retorna lista de posições [(x1, y1), ...] ou None se não houver caminho.
         """
         
-        if self.explorer.get_name == "EXPL_1":
-                print(f"Explorador: {self.explorer.get_name()} OI")
+        # print(f"Explorador: {self.explorer.get_name()} OI")
                 
         # Fila de prioridade (Heap mínimo) para os nós a serem explorados 
         open_set = []
@@ -140,14 +116,13 @@ class Astar:
         # Dicionário para armazenar os custos g (custo do início até o nó)
         g_scores = {start: 0}
         
-        if self.explorer.get_name == "EXPL_1":
-                print(f"Explorador: {self.explorer.get_name()} COMEÇANDO")
+        # print(f"Explorador: {self.explorer.get_name()} COMEÇANDO")
         
         # print(f"Start: {start}, Goal: {goal}")
 
         while open_set:
-            if self.explorer.get_name == "EXPL_1":
-                print(f"Explorador: {self.explorer.get_name()} - A* - Open set: {len(open_set)}, Closed set: {len(closed_set)}")
+            # if self.explorer.get_name == "EXPL_1":
+            #     print(f"Explorador: {self.explorer.get_name()} - A* - Open set: {len(open_set)}, Closed set: {len(closed_set)}")
             current = heapq.heappop(open_set)
             if current.position == goal:
                 return self.reconstruct_path(current)
@@ -167,7 +142,7 @@ class Astar:
     def reconstruct_path(self, node):
         path = []
         while node:
-            path.append(node.position)
+            path.append((node.position, node.g))
             node = node.parent
         return path[::-1]
     
