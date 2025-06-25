@@ -36,6 +36,8 @@ from vs.constants import VS
 
 class Map:
     def __init__(self):
+        self.obstacles = {}
+        self.victims = {}
         self.data = {}
     
     def in_map(self, coord):
@@ -101,5 +103,10 @@ class Map:
                     row += f"[     ?     ] "
             print(row)
 
+    def add_obstacle(self, x, y, difficulty):
+        self.obstacles[(x, y)] = difficulty
+
+    def add_victim(self, vid, coords):
+        self.victims[vid] = coords
 
     

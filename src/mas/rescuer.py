@@ -184,73 +184,14 @@ class Rescuer(AbstAgent):
         plan, time = bfs.search(start, goal, self.plan_rtime)
         self.plan = self.plan + plan
         self.plan_rtime = self.plan_rtime - time
-           
 
     def sync_explorers(self, explorer_map, victims):
-        """ This method should be invoked only to the master agent
-
-        Each explorer sends the map containing the obstacles and
-        victims' location. The master rescuer updates its map with the
-        received one. It does the same for the victims' vital signals.
-        After, it should classify each severity of each victim (critical, ..., stable);
-        Following, using some clustering method, it should group the victims and
-        and pass one (or more)clusters to each rescuer """
-
-        self.received_maps += 1
-
-        print(f"\n{self.NAME} Map received from the explorer")
-        self.map.update(explorer_map)
-        self.victims.update(victims)
-
-        if self.received_maps == self.nb_of_explorers:
-            print(f"{self.NAME} all maps received from the explorers")
-            # #self.map.draw()
-            # #print(f"{self.NAME} found victims by all explorers:\n{self.victims}")
-
-            # #@TODO predict the severity and the class of victims' using a classifier
-            # self.predict_severity_and_class()
-
-            # #@TODO cluster the victims possibly using the severity and other criteria
-            # # Here, there 4 clusters
-            # clusters_of_vic = self.cluster_victims()
-
-            # for i, cluster in enumerate(clusters_of_vic):
-            #     self.save_cluster_csv(cluster, i+1)    # file names start at 1
-  
-            # # Instantiate the other rescuers
-            # rescuers = [None] * 4
-            # rescuers[0] = self                    # the master rescuer is the index 0 agent
-
-            # # Assign the cluster the master agent is in charge of 
-            # self.clusters = [clusters_of_vic[0]]  # the first one
-
-            # # Instantiate the other rescuers and assign the clusters to them
-            # for i in range(1, 4):    
-            #     #print(f"{self.NAME} instantianting rescuer {i+1}, {self.get_env()}")
-            #     filename = f"rescuer_{i+1:1d}_config.txt"
-            #     config_file = os.path.join(self.config_folder, filename)
-            #     # each rescuer receives one cluster of victims
-            #     rescuers[i] = Rescuer(self.get_env(), config_file, 4, [clusters_of_vic[i]]) 
-            #     rescuers[i].map = self.map     # each rescuer have the map
-
-            
-            # # Calculate the sequence of rescue for each agent
-            # # In this case, each agent has just one cluster and one sequence
-            # self.sequences = self.clusters         
-
-            # # For each rescuer, we calculate the rescue sequence 
-            # for i, rescuer in enumerate(rescuers):
-            #     rescuer.sequencing()         # the sequencing will reorder the cluster
-                
-            #     for j, sequence in enumerate(rescuer.sequences):
-            #         if j == 0:
-            #             self.save_sequence_csv(sequence, i+1)              # primeira sequencia do 1o. cluster 1: seq1 
-            #         else:
-            #             self.save_sequence_csv(sequence, (i+1)+ j*10)      # demais sequencias do 1o. cluster: seq11, seq12, seq13, ...
-
-            
-            #     rescuer.planner()            # make the plan for the trajectory
-            #     rescuer.set_state(VS.ACTIVE) # from now, the simulator calls the deliberation method 
+        # Atualiza mapa global de obstáculos
+        for (x, y), diff in explorer_map.obstacles.items():
+            self.map.set_obstacle(x, y, diff)
+        # Atualiza mapa global de vítimas
+        for vid, (coords, signals) in victims.items():
+            self.victims[vid] = (coords, signals)
          
         
     def deliberate(self) -> bool:
