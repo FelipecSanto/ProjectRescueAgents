@@ -25,7 +25,7 @@ def main(data_folder_name, config_ag_folder_name):
 
     # Instancia o agente mestre socorrista (vai receber os mapas)
     rescuer_file = os.path.join(config_ag_folder, "rescuer_1_config.txt")
-    master_rescuer = Rescuer(env, rescuer_file, 4)  # 4 é o número de exploradores
+    master_rescuer = Rescuer(env, rescuer_file, config_ag_folder, 4)  # 4 é o número de exploradores
 
     # Instancia os exploradores, que conhecem o mestre para sincronizar os dados
     for exp in range(1, 5):
@@ -33,19 +33,13 @@ def main(data_folder_name, config_ag_folder_name):
         explorer_file = os.path.join(config_ag_folder, filename)
         Explorer(env, explorer_file, master_rescuer, exp)
 
-    # Executa a simulação no ambiente
+    # Executa a simulação no ambiente para a exploração
     env.run()
-
-    # === Etapa de agrupamento (clustering) após retorno dos exploradores ===
-    n_clusters = 4
-    print("Agrupando vítimas em", n_clusters, "clusters...")
-    clusters = cluster_victims(master_rescuer.victims, n_clusters)
-    save_clusters(clusters, master_rescuer.victims)
-    print("Clusters salvos em /clusters")
-
+    
     # Exibe resultados acumulados no terminal
     env.print_results()
     env.print_acum_results()
+    
 
 
 if __name__ == '__main__':
@@ -53,7 +47,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         data_folder_name = sys.argv[1]
     else:
-        data_folder_name = os.path.join("datasets", "data_430v_94x94")
+        data_folder_name = os.path.join("datasets", "data_42v_20x20")
 
     config_ag_folder_name = os.path.join("src", "cfg_1")
 

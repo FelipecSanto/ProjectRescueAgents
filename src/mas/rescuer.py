@@ -15,6 +15,8 @@ import random
 import math
 import csv
 import sys
+import numpy as np
+from sklearn.cluster import KMeans
 from map import Map
 from vs.abstract_agent import AbstAgent
 from vs.physical_agent import PhysAgent
@@ -22,10 +24,12 @@ from vs.constants import VS
 from bfs import BFS
 from abc import ABC, abstractmethod
 
+# Importa funções de clustering
+from clustering import cluster_victims, save_clusters
 
 ## Classe que define o Agente Rescuer com um plano fixo
 class Rescuer(AbstAgent):
-    def __init__(self, env, config_file, nb_of_explorers=1,clusters=[]):
+    def __init__(self, env, config_file, config_ag_folder, nb_of_explorers=1,clusters=[],):
         """ 
         @param env: a reference to an instance of the environment class
         @param config_file: the absolute path to the agent's config file
@@ -50,19 +54,35 @@ class Rescuer(AbstAgent):
         self.clusters = clusters     # the clusters of victims this agent should take care of - see the method cluster_victims
         self.sequences = clusters    # the sequence of visit of victims for each cluster 
         
+        self.config_ag_folder = config_ag_folder
+        self.env = env
+        
                 
         # Starts in IDLE state.
         # It changes to ACTIVE when the map arrives
         self.set_state(VS.IDLE)
 
-    def save_cluster_csv(self, cluster, cluster_id):
-        filename = f"./clusters/cluster{cluster_id}.txt"
-        with open(filename, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            for vic_id, values in cluster.items():
-                x, y = values[0]      # x,y coordinates
-                vs = values[1]        # list of vital signals
-                writer.writerow([vic_id, x, y, vs[6], vs[7]])
+    def save_clusters_csv(self, clusters):
+        """  """
+        
+        print("Salvando clusters em /clusters...")
+        
+        os.makedirs("clusters", exist_ok=True)
+
+        for i, cluster in enumerate(clusters, start=1):
+            file_path = os.path.join("clusters", f"cluster{i}.txt")
+            with open(file_path, "w") as f:
+                for vid in cluster:
+                    x, y = self.victims[vid][0]
+                    # gravidade e classe: se estiverem presentes, inclui; senão, usa vazio
+                    grav = ""
+                    classe = ""
+                    if len(self.victims[vid]) >= 4:
+                        classe = self.victims[vid][2]
+                        grav = self.victims[vid][3]
+                    f.write(f"{vid},{x},{y},{grav},{classe}\n")
+                    
+        print("Clusters salvos em /clusters")
 
     def save_sequence_csv(self, sequence, sequence_id):
         filename = f"./clusters/seq{sequence_id}.txt"
@@ -74,55 +94,37 @@ class Rescuer(AbstAgent):
                 writer.writerow([id, x, y, vs[6], vs[7]])
 
     def cluster_victims(self):
-        """ this method does a naive clustering of victims per quadrant: victims in the
-            upper left quadrant compose a cluster, victims in the upper right quadrant, another one, and so on.
+        """ Agrupa vítimas em clusters com base em suas coordenadas (x, y).
+
+                :param victims: dicionário no formato {id: ((x, y), sinais_vitais)}
+                :param n_clusters: número de clusters (igual ao número de socorristas)
+                
+                :return: lista de clusters, cada um é uma lista de ids de vítimas
+        """
+        
+        print("Agrupando vítimas em", self.nb_of_explorers, "clusters...")
+        
+        if len(self.victims) < self.nb_of_explorers:
+            raise ValueError(f"Número de vítimas ({len(self.victims)}) é menor que o número de clusters ({self.nb_of_explorers})")
+
+        victim_ids = list(self.victims.keys())
+        coords = np.array([self.victims[vid][0] for vid in victim_ids])  # extrai (x,y) de cada vítima
+
+        # Aplica KMeans para gerar os clusters
+        kmeans = KMeans(n_clusters=self.nb_of_explorers, random_state=42, n_init='auto')
+        labels = kmeans.fit_predict(coords)
+
+        # Agrupa os ids por rótulo de cluster
+        clusters = {i: [] for i in range(self.nb_of_explorers)}
+        for vid, label in zip(victim_ids, labels):
+            clusters[label].append(vid)
             
-            @returns: a list of clusters where each cluster is a dictionary in the format [vic_id]: ((x,y), [<vs>])
-                      such as vic_id is the victim id, (x,y) is the victim's position, and [<vs>] the list of vital signals
-                      including the severity value and the corresponding label"""
-
-
-        # Find the upper and lower limits for x and y
-        lower_xlim = sys.maxsize    
-        lower_ylim = sys.maxsize
-        upper_xlim = -sys.maxsize - 1
-        upper_ylim = -sys.maxsize - 1
-
-        vic = self.victims
-    
-        for key, values in self.victims.items():
-            x, y = values[0]
-            lower_xlim = min(lower_xlim, x) 
-            upper_xlim = max(upper_xlim, x)
-            lower_ylim = min(lower_ylim, y)
-            upper_ylim = max(upper_ylim, y)
         
-        # Calculate midpoints
-        mid_x = lower_xlim + (upper_xlim - lower_xlim) / 2
-        mid_y = lower_ylim + (upper_ylim - lower_ylim) / 2
-        print(f"{self.NAME} ({lower_xlim}, {lower_ylim}) - ({upper_xlim}, {upper_ylim})")
-        print(f"{self.NAME} cluster mid_x, mid_y = {mid_x}, {mid_y}")
-    
-        # Divide dictionary into quadrants
-        upper_left = {}
-        upper_right = {}
-        lower_left = {}
-        lower_right = {}
+        print("Clusters criados!")
         
-        for key, values in self.victims.items():  # values are pairs: ((x,y), [<vital signals list>])
-            x, y = values[0]
-            if x <= mid_x:
-                if y <= mid_y:
-                    upper_left[key] = values
-                else:
-                    lower_left[key] = values
-            else:
-                if y <= mid_y:
-                    upper_right[key] = values
-                else:
-                    lower_right[key] = values
-    
-        return [upper_left, upper_right, lower_left, lower_right]
+        self.clusters = list(clusters.values())
+
+        self.save_clusters_csv(self.clusters)
 
     def predict_severity_and_class(self):
         """ @TODO to be replaced by a classifier and a regressor to calculate the class of severity and the severity values.
@@ -186,13 +188,22 @@ class Rescuer(AbstAgent):
         self.plan_rtime = self.plan_rtime - time
 
     def sync_explorers(self, explorer_map, victims):
-        # Atualiza mapa global de obstáculos
-        for (x, y), diff in explorer_map.obstacles.items():
-            self.map.set_obstacle(x, y, diff)
+        # Atualiza mapa global
+        self.map.update(explorer_map)
         # Atualiza mapa global de vítimas
         for vid, (coords, signals) in victims.items():
             self.victims[vid] = (coords, signals)
-         
+            
+        self.received_maps += 1
+        
+        self.cluster_victims()
+        
+        if self.received_maps == self.nb_of_explorers:
+            print("Fase de exploração terminada")
+            for exp in range(2, self.nb_of_explorers + 1):
+                filename = f"rescuer_{exp:1d}_config.txt"
+                rescuer_file = os.path.join(self.config_ag_folder, filename)
+                Rescuer(self.env, rescuer_file, self.config_ag_folder, self.nb_of_explorers, self.clusters)
         
     def deliberate(self) -> bool:
         """ This is the choice of the next action. The simulator calls this
