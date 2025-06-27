@@ -57,6 +57,7 @@ class Explorer(AbstAgent):
         self.lista = []
         self.min = 0, 0
         self.return_time = 0
+        self.finishedQ = False
         
         self.aStar = Astar(self.map, self)
         self.return_path = []
@@ -105,7 +106,8 @@ class Explorer(AbstAgent):
                         self.min = self.min[0] + battery, self.min[1] - battery
                     if self.quadrante == 3:
                         self.min = self.min[0] + battery, self.min[1] + battery
-                    return (0, 0), False
+                    self.finishedQ = True
+                    return self.get_next_position()
                 result = result[0] * -1, result[1] * -1
                 return result, False
             
@@ -304,7 +306,7 @@ class Explorer(AbstAgent):
             self.update_cont += 1
         
         # keeps exploring while there is enough time
-        if self.get_rtime() > self.return_time * 2 + 50:
+        if self.get_rtime() > self.return_time * 2 + 50 and not(self.finishedQ and self.walk_stack.is_empty()):
             self.explore()
             return True
 
