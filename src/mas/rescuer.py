@@ -63,29 +63,40 @@ class Rescuer(AbstAgent):
         self.set_state(VS.IDLE)
 
     def save_clusters_csv(self, clusters):
-        """  """
-        
+        """
+        Salva os clusters em arquivos, incluindo severidade e classe previstos.
+        """
         print("Salvando clusters em /clusters...")
-        
-        os.makedirs("clusters", exist_ok=True)
+
+        # Caminho absoluto para o diretório pai da pasta atual (mas)
+        parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        clusters_dir = os.path.join(parent_dir, "clusters")
+        os.makedirs(clusters_dir, exist_ok=True)
 
         for i, cluster in enumerate(clusters, start=1):
-            file_path = os.path.join("clusters", f"cluster{i}.txt")
+            file_path = os.path.join(clusters_dir, f"cluster{i}.txt")
             with open(file_path, "w") as f:
                 for vid in cluster:
                     x, y = self.victims[vid][0]
-                    # gravidade e classe: se estiverem presentes, inclui; senão, usa vazio
+                    vs = self.victims[vid][1]
+                    # Usa os valores previstos de severidade e classe (índices -2 e -1)
                     grav = ""
                     classe = ""
-                    if len(self.victims[vid]) >= 4:
-                        classe = self.victims[vid][2]
-                        grav = self.victims[vid][3]
+                    if len(vs) >= 8:
+                        grav = vs[-2]
+                        classe = vs[-1]
                     f.write(f"{vid},{x},{y},{grav},{classe}\n")
-                    
+
         print("Clusters salvos em /clusters")
 
     def save_sequence_csv(self, sequence, sequence_id):
-        filename = f"./clusters/seq{sequence_id}.txt"
+        
+        # Caminho absoluto para o diretório pai da pasta atual (mas)
+        parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        seqs_dir = os.path.join(parent_dir, "seqs")
+        os.makedirs(seqs_dir, exist_ok=True)
+        
+        filename = os.path.join(seqs_dir, f"seq{sequence_id}.txt")
         with open(filename, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             for id, values in sequence.items():
@@ -103,7 +114,7 @@ class Rescuer(AbstAgent):
         """
         
         print("Agrupando vítimas em", self.nb_of_explorers, "clusters...")
-        
+
         if len(self.victims) < self.nb_of_explorers:
             raise ValueError(f"Número de vítimas ({len(self.victims)}) é menor que o número de clusters ({self.nb_of_explorers})")
 
@@ -118,24 +129,40 @@ class Rescuer(AbstAgent):
         clusters = {i: [] for i in range(self.nb_of_explorers)}
         for vid, label in zip(victim_ids, labels):
             clusters[label].append(vid)
-            
-        
-        print("Clusters criados!")
-        
-        self.clusters = list(clusters.values())
 
+        print("Clusters criados!")
+
+        self.clusters = list(clusters.values())
+        self.sequences = self.clusters
+
+        # Salva os clusters usando os valores de severidade e classe previstos
         self.save_clusters_csv(self.clusters)
 
     def predict_severity_and_class(self):
-        """ @TODO to be replaced by a classifier and a regressor to calculate the class of severity and the severity values.
-            This method should add the vital signals(vs) of the self.victims dictionary with these two values.
-
-            This implementation assigns random values to both, severity value and class"""
-
+        """
+        Prediz a gravidade (valor contínuo) e a classe (1 a 4) para cada vítima.
+        Neste exemplo, usamos um modelo fictício: a gravidade é uma função dos sinais vitais,
+        e a classe é baseada em limiares desse valor.
+        """
         for vic_id, values in self.victims.items():
-            severity_value = random.uniform(0.1, 99.9)          # to be replaced by a regressor 
-            severity_class = random.randint(1, 4)               # to be replaced by a classifier
-            values[1].extend([severity_value, severity_class])  # append to the list of vital signals; values is a pair( (x,y), [<vital signals list>] )
+            vs = values[1]
+            # Exemplo: gravidade como média dos sinais vitais (ajuste conforme necessário)
+            severity_value = float(np.mean(vs[:6]))  # supondo que os 6 primeiros são sinais vitais
+            # Classificação baseada em limiares arbitrários
+            if severity_value > 75:
+                severity_class = 1  # Crítico
+            elif severity_value > 50:
+                severity_class = 2  # Instável
+            elif severity_value > 25:
+                severity_class = 3  # Potencialmente estável
+            else:
+                severity_class = 4  # Estável
+            # Adiciona ao vetor de sinais vitais
+            # Remove valores antigos se já existirem (evita duplicação)
+            if len(vs) > 6:
+                vs = vs[:6]
+            vs.extend([severity_value, severity_class])
+            self.victims[vic_id] = (values[0], vs)
 
 
     def sequencing(self):
@@ -196,10 +223,10 @@ class Rescuer(AbstAgent):
             
         self.received_maps += 1
         
-        self.cluster_victims()
-        
         if self.received_maps == self.nb_of_explorers:
             print("Fase de exploração terminada")
+            self.predict_severity_and_class()
+            self.cluster_victims()
             for exp in range(2, self.nb_of_explorers + 1):
                 filename = f"rescuer_{exp:1d}_config.txt"
                 rescuer_file = os.path.join(self.config_ag_folder, filename)

@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+.vscode/
+
+vs/__pycache__/
+
+src/mas/__pycache__/
