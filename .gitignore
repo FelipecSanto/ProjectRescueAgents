@@ -36,3 +36,5 @@
 vs/__pycache__/
 
 src/mas/__pycache__/
+
+src/model/*.joblib

@@ -23,6 +23,8 @@ from vs.physical_agent import PhysAgent
 from vs.constants import VS
 from bfs import BFS
 from abc import ABC, abstractmethod
+import joblib
+import subprocess
 
 # Importa funções de clustering
 from clustering import cluster_victims, save_clusters
@@ -139,30 +141,55 @@ class Rescuer(AbstAgent):
         self.save_clusters_csv(self.clusters)
 
     def predict_severity_and_class(self):
-        """
-        Prediz a gravidade (valor contínuo) e a classe (1 a 4) para cada vítima.
-        Neste exemplo, usamos um modelo fictício: a gravidade é uma função dos sinais vitais,
-        e a classe é baseada em limiares desse valor.
-        """
+        """ Prediz gravidade (regressão) e classe (classificação) para cada vítima usando modelos treinados.
+        Usa os sinais vitais como entrada e armazena os resultados na lista de sinais vitais da vítima. """
+        
+        # Caminho dos modelos
+        MODEL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src", "model"))
+        rf_reg_path = os.path.join(MODEL_DIR, "best_rf_reg.joblib")
+        xgb_clf_path = os.path.join(MODEL_DIR, "best_xgb_clf.joblib")
+        scaler_path = os.path.join(MODEL_DIR, "scaler.joblib")
+
+        # Tenta carregar os modelos, se não existir, chama o script de treino
+        try:
+            rf_reg = joblib.load(rf_reg_path)
+            xgb_clf = joblib.load(xgb_clf_path)
+            scaler = joblib.load(scaler_path)
+        except FileNotFoundError:
+            print("Modelos não encontrados. Treinando modelos...")
+            # Executa o script de treinamento
+            script_path = os.path.join(MODEL_DIR, "treina_modelos.py")
+            subprocess.run(["python3", script_path], check=True)
+            # Tenta carregar novamente
+            rf_reg = joblib.load(rf_reg_path)
+            xgb_clf = joblib.load(xgb_clf_path)
+            scaler = joblib.load(scaler_path)
+        
         for vic_id, values in self.victims.items():
-            vs = values[1]
-            # Exemplo: gravidade como média dos sinais vitais (ajuste conforme necessário)
-            severity_value = float(np.mean(vs[:6]))  # supondo que os 6 primeiros são sinais vitais
-            # Classificação baseada em limiares arbitrários
-            if severity_value > 75:
-                severity_class = 1  # Crítico
-            elif severity_value > 50:
-                severity_class = 2  # Instável
-            elif severity_value > 25:
-                severity_class = 3  # Potencialmente estável
-            else:
-                severity_class = 4  # Estável
-            # Adiciona ao vetor de sinais vitais
-            # Remove valores antigos se já existirem (evita duplicação)
-            if len(vs) > 6:
-                vs = vs[:6]
-            vs.extend([severity_value, severity_class])
-            self.victims[vic_id] = (values[0], vs)
+            coords, vs = values
+
+            # Garante que estamos usando apenas os sinais vitais relevantes (6 primeiros)
+            if len(vs) < 6:
+                continue  # ignora vítima com dados incompletos
+
+            vitals = vs[:6]
+            qPA, pulso, freq_resp = vitals[0], vitals[1], vitals[2]
+
+            # Engenharia de atributos como no treino
+            qPA_pulso_ratio = qPA / pulso if pulso != 0 else 0
+            pulso_freq_prod = pulso * freq_resp
+            qPA_minus_pulso = qPA - pulso
+
+            features = [qPA, pulso, freq_resp, qPA_pulso_ratio, pulso_freq_prod, qPA_minus_pulso]
+            features_scaled = scaler.transform([features])
+
+            grav_pred = rf_reg.predict(features_scaled)[0]
+            classe_pred = xgb_clf.predict(features_scaled)[0]
+
+            # Atualiza sinais vitais com as predições
+            vs = vs[:6]  # remove predições anteriores
+            vs.extend([grav_pred, int(classe_pred)])
+            self.victims[vic_id] = (coords, vs)
 
 
     def sequencing(self):
