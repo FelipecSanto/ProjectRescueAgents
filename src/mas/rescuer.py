@@ -18,6 +18,7 @@ import sys
 import numpy as np
 from sklearn.cluster import KMeans
 from map import Map
+from Astar import Astar
 from vs.abstract_agent import AbstAgent
 from vs.physical_agent import PhysAgent
 from vs.constants import VS
@@ -31,7 +32,7 @@ from clustering import cluster_victims, save_clusters
 
 ## Classe que define o Agente Rescuer com um plano fixo
 class Rescuer(AbstAgent):
-    def __init__(self, env, config_file, config_ag_folder, nb_of_explorers=1,clusters=[],):
+    def __init__(self, env, config_file, config_ag_folder, nb_of_explorers=1,clusters=[]):
         """ 
         @param env: a reference to an instance of the environment class
         @param config_file: the absolute path to the agent's config file
@@ -159,7 +160,10 @@ class Rescuer(AbstAgent):
             print("Modelos não encontrados. Treinando modelos...")
             # Executa o script de treinamento
             script_path = os.path.join(MODEL_DIR, "train_rescuer_models.py")
-            subprocess.run(["python3", script_path], check=True)
+            if os.name == "nt":  # Windows
+                subprocess.run(["python", script_path], check=True)
+            else:  # POSIX (Linux, macOS, etc.)
+                subprocess.run(["python3", script_path], check=True)
             # Tenta carregar novamente
             rf_reg = joblib.load(rf_reg_path)
             xgb_clf = joblib.load(xgb_clf_path)
@@ -192,20 +196,12 @@ class Rescuer(AbstAgent):
             self.victims[vic_id] = (coords, vs)
 
 
-    def sequencing(self):
-        """ Currently, this method sort the victims by the x coordinate followed by the y coordinate
-            @TODO It must be replaced by a Genetic Algorithm that finds the possibly best visiting order """
-
-        """ We consider an agent may have different sequences of rescue. The idea is the rescuer can execute
-            sequence[0], sequence[1], ...
-            A sequence is a dictionary with the following structure: [vic_id]: ((x,y), [<vs>]"""
+    def sequencing(self, cluster):
 
         new_sequences = []
 
-        for seq in self.sequences:   # a list of sequences, being each sequence a dictionary
-            seq = dict(sorted(seq.items(), key=lambda item: item[1]))
-            new_sequences.append(seq)       
-            #print(f"{self.NAME} sequence of visit:\n{seq}\n")
+        for victim in sorted(cluster, key=lambda v: self.victims[v][1][7], reverse=True):
+            new_sequences.append(victim)
 
         self.sequences = new_sequences
 
@@ -213,9 +209,7 @@ class Rescuer(AbstAgent):
         """ A method that calculates the path between victims: walk actions in a OFF-LINE MANNER (the agent plans, stores the plan, and
             after it executes. Eeach element of the plan is a pair dx, dy that defines the increments for the the x-axis and  y-axis."""
 
-
-        # let's instantiate the breadth-first search
-        bfs = BFS(self.map, self.COST_LINE, self.COST_DIAG)
+        aStar = Astar(self.map, self)
 
         # for each victim of the first sequence of rescue for this agent, we're going go calculate a path
         # starting at the base - always at (0,0) in relative coords
@@ -226,20 +220,31 @@ class Rescuer(AbstAgent):
         # we consider only the first sequence (the simpler case)
         # The victims are sorted by x followed by y positions: [vic_id]: ((x,y), [<vs>]
 
-        sequence = self.sequences[0]
-        start = (0,0) # always from starting at the base
-        for vic_id in sequence:
-            goal = sequence[vic_id][0]
-            plan, time = bfs.search(start, goal, self.plan_rtime)
-            self.plan = self.plan + plan
+        base = (0,0)
+        start = (0,0)
+        total_plan = []
+        for vic_id in self.sequences:
+            goal = self.victims[vic_id][0]
+            plan = aStar.search(start, goal)
+            time = plan[len(plan)- 1][1] * 1.15 + 1 # Assume que pode perder mais tempo do que o planejado (dando medkit para as vitimas no meio do caminho) + 1 da vitima que vai chegar
+            base_plan = aStar.search(goal, base) 
+            base_time = base_plan[len(base_plan) - 1][1] * 1.15 # O mesmo vale para o caminho de volta ao base
+            if(self.plan_rtime - time < base_time + 50): # +50 de gap
+                continue
+            total_plan = total_plan + plan
             self.plan_rtime = self.plan_rtime - time
             start = goal
 
         # Plan to come back to the base
-        goal = (0,0)
-        plan, time = bfs.search(start, goal, self.plan_rtime)
-        self.plan = self.plan + plan
-        self.plan_rtime = self.plan_rtime - time
+        plan = aStar.search(start, base)
+        total_plan = total_plan + plan
+        anterior = total_plan[1][0]
+        self.plan.append(anterior) # add the first action to the plan
+        for p in total_plan[2:]:
+            x = p[0][0] - anterior[0]
+            y = p[0][1] - anterior[1]
+            self.plan.append((x,y))
+            anterior = p[0]
 
     def sync_explorers(self, explorer_map, victims):
         # Atualiza mapa global
@@ -257,7 +262,16 @@ class Rescuer(AbstAgent):
             for exp in range(2, self.nb_of_explorers + 1):
                 filename = f"rescuer_{exp:1d}_config.txt"
                 rescuer_file = os.path.join(self.config_ag_folder, filename)
-                Rescuer(self.env, rescuer_file, self.config_ag_folder, self.nb_of_explorers, self.clusters)
+                rescuer = Rescuer(self.env, rescuer_file, self.config_ag_folder, self.nb_of_explorers)
+                rescuer.victims = self.victims  # share the victims with the rescuer
+                rescuer.clusters = self.clusters  # share the clusters with the rescuer
+                rescuer.map = self.map
+                rescuer.sequencing(self.clusters[exp-1])  
+                rescuer.planner()
+                rescuer.set_state(VS.ACTIVE)  # set the rescuer to ACTIVE state
+            self.sequencing(self.clusters[0])  
+            self.planner()
+            self.set_state(VS.ACTIVE)  # set the rescuer to ACTIVE state
         
     def deliberate(self) -> bool:
         """ This is the choice of the next action. The simulator calls this
@@ -289,6 +303,7 @@ class Rescuer(AbstAgent):
                 vic_id = self.map.get_vic_id((self.x, self.y))
                 if vic_id != VS.NO_VICTIM:
                     self.first_aid()
+                    self.plan_rtime -= 1
                     #if self.first_aid(): # True when rescued
                         #print(f"{self.NAME} Victim rescued at ({self.x}, {self.y})")                    
         else:
