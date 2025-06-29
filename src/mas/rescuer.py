@@ -158,7 +158,7 @@ class Rescuer(AbstAgent):
         except FileNotFoundError:
             print("Modelos não encontrados. Treinando modelos...")
             # Executa o script de treinamento
-            script_path = os.path.join(MODEL_DIR, "treina_modelos.py")
+            script_path = os.path.join(MODEL_DIR, "train_rescuer_models.py")
             subprocess.run(["python3", script_path], check=True)
             # Tenta carregar novamente
             rf_reg = joblib.load(rf_reg_path)
