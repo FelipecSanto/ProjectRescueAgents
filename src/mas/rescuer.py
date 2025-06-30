@@ -226,10 +226,10 @@ class Rescuer(AbstAgent):
         for vic_id in self.sequences:
             goal = self.victims[vic_id][0]
             plan = aStar.search(start, goal)
-            time = plan[len(plan)- 1][1] * 1.15 + 1 # Assume que pode perder mais tempo do que o planejado (dando medkit para as vitimas no meio do caminho) + 1 da vitima que vai chegar
+            time = plan[len(plan)- 1][1] * 1.2 + 1 # Assume que pode perder mais tempo do que o planejado
             base_plan = aStar.search(goal, base) 
-            base_time = base_plan[len(base_plan) - 1][1] * 1.15 # O mesmo vale para o caminho de volta ao base
-            if(self.plan_rtime - time < base_time + 50): # +50 de gap
+            base_time = base_plan[len(base_plan) - 1][1] * 1.2 # O mesmo vale para o caminho de volta ao base
+            if(self.plan_rtime - time < base_time + 60): # +60 de gap
                 continue
             total_plan = total_plan + plan
             self.plan_rtime = self.plan_rtime - time
