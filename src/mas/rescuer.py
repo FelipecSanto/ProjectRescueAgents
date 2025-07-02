@@ -153,6 +153,7 @@ class Rescuer(AbstAgent):
 
         # Tenta carregar os modelos, se não existir, chama o script de treino
         try:
+            print("Carregando modelos...")
             rf_reg = joblib.load(rf_reg_path)
             xgb_clf = joblib.load(xgb_clf_path)
             scaler = joblib.load(scaler_path)
@@ -192,7 +193,7 @@ class Rescuer(AbstAgent):
 
             # Atualiza sinais vitais com as predições
             vs = vs[:6]  # remove predições anteriores
-            vs.extend([grav_pred, int(classe_pred)])
+            vs.extend([grav_pred, int(classe_pred) + 1])  # + 1 Corrige classe para 1-4
             self.victims[vic_id] = (coords, vs)
 
 
