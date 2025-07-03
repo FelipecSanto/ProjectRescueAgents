@@ -1,0 +1,49 @@
+------------------------------------------------------------
+GENERAL METRICS
+
+Reference dataset: datasets/data_430v_100x100/target.txt Length: 420
+Predict          : tools/salvas.txt Length: 211
+Matching rows    : 211
+
+------------------------------------------------------------
+REGRESSOR METRICS
+Root Mean Square Error (RMSE) for matching rows: 36.92
+
+------------------------------------------------------------
+CLASSIFICATION METRICS
+
+Confusion Matrix:
+[[14 36  0  0]
+ [43 42  3  0]
+ [34  2  0  0]
+ [37  0  0  0]]
+
+Accuracy: 0.26540284360189575
+
+Classification Report:
+              precision    recall  f1-score   support
+
+     Critico       0.11      0.28      0.16        50
+    Instavel       0.53      0.48      0.50        88
+ Pot Estavel       0.00      0.00      0.00        36
+     Estavel       0.00      0.00      0.00        37
+
+    accuracy                           0.27       211
+   macro avg       0.16      0.19      0.16       211
+weighted avg       0.24      0.27      0.25       211
+
+
+------------------------------------------------------------
+SPECIFIC METRICS
+
+   Critical victims   (1) =  50 out of 126 (39.7)%
+   Instable victims   (2) =  88 out of 144 (61.1)%
+   Pot. inst. victims (3) =  36 out of 76 (47.4)%
+   Stable victims     (4) =  37 out of 74 (50.0)%
+   --------------------------------------
+   Total of victims  = 211 (50.24%)
+
+   Weighted victims per severity = 32.00
+
+   Sum of gravities of matched victims = 9135.42 of a total of 17815.71
+     % of gravities of matched victims = 0.51

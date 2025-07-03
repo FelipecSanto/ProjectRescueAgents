@@ -113,17 +113,21 @@ rf_reg = RandomForestRegressor(n_jobs=-1, random_state=42)
 rf_clf = RandomForestClassifier(n_jobs=-1, random_state=42)
 
 param_dist_reg = {
-    "n_estimators": [100, 200, 300],
-    "max_depth": [10, 15, 20, None],
-    "min_samples_split": [2, 5, 10],
-    "max_features": ["sqrt", "log2", None]
+    "n_estimators": [100, 200, 300, 400, 500],
+    "max_depth": [10, 15, 20, 25, 30, None],
+    "min_samples_split": [2, 5, 10, 15],
+    "max_features": ["sqrt", "log2", None],
+    "min_samples_leaf": [1, 2, 4, 8],
+    "bootstrap": [True, False]
 }
 
 param_dist_clf = {
-    "n_estimators": [100, 200, 300],
-    "max_depth": [10, 15, 20, None],
-    "min_samples_split": [2, 5, 10],
-    "max_features": ["sqrt", "log2", None]
+    "n_estimators": [100, 200, 300, 400, 500],
+    "max_depth": [10, 15, 20, 25, 30, None],
+    "min_samples_split": [2, 5, 10, 15],
+    "max_features": ["sqrt", "log2", None],
+    "min_samples_leaf": [1, 2, 4, 8],
+    "bootstrap": [True, False]
 }
 
 tuner_reg = RandomizedSearchCV(
@@ -239,18 +243,18 @@ rf_reg_path = os.path.join(ROOT, "best_rf_reg.joblib")
 xgb_clf_path = os.path.join(ROOT, "best_xgb_clf.joblib")
 scaler_path = os.path.join(ROOT, "scaler.joblib")
 
-# Treinar e salvar apenas se não existirem
-if not (os.path.exists(rf_reg_path) and os.path.exists(xgb_clf_path) and os.path.exists(scaler_path)):
-    # Treinar o XGBoost final com todos os dados (SMOTE)
-    if HAS_XGB:
-        final_xgb_clf = XGBClassifier(
-            n_estimators=300, learning_rate=0.05, max_depth=6, subsample=0.8
-        )
-        final_xgb_clf.fit(X_smote, y_smote_xgb)
-        joblib.dump(final_xgb_clf, xgb_clf_path)
+# # Treinar e salvar apenas se não existirem
+# if not (os.path.exists(rf_reg_path) and os.path.exists(xgb_clf_path) and os.path.exists(scaler_path)):
+#     # Treinar o XGBoost final com todos os dados (SMOTE)
+#     if HAS_XGB:
+#         final_xgb_clf = XGBClassifier(
+#             n_estimators=300, learning_rate=0.05, max_depth=6, subsample=0.8
+#         )
+#         final_xgb_clf.fit(X_smote, y_smote_xgb)
+#         joblib.dump(final_xgb_clf, xgb_clf_path)
 
-    joblib.dump(best_rf_reg, rf_reg_path)
-    joblib.dump(scaler, scaler_path)
-    print("✅ Modelos treinados e salvos.")
-else:
-    print("✅ Modelos já existem, pulando treinamento.")
+#     joblib.dump(best_rf_reg, rf_reg_path)
+#     joblib.dump(scaler, scaler_path)
+#     print("✅ Modelos treinados e salvos.")
+# else:
+#     print("✅ Modelos já existem, pulando treinamento.")
