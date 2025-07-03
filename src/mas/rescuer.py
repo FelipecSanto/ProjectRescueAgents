@@ -30,10 +30,12 @@ import subprocess
 # Importa funções de clustering
 from clustering import cluster_victims, save_clusters
 
+from lime.lime_tabular import LimeTabularExplainer
+
 ## Classe que define o Agente Rescuer com um plano fixo
 class Rescuer(AbstAgent):
     def __init__(self, env, config_file, config_ag_folder, nb_of_explorers=1,clusters=[]):
-        """ 
+        """
         @param env: a reference to an instance of the environment class
         @param config_file: the absolute path to the agent's config file
         @param nb_of_explorers: number of explorer agents to wait for
@@ -49,18 +51,18 @@ class Rescuer(AbstAgent):
         self.plan = []               # a list of planned actions in increments of x and y
         self.plan_x = 0              # the x position of the rescuer during the planning phase
         self.plan_y = 0              # the y position of the rescuer during the planning phase
-        self.plan_visited = set()    # positions already planned to be visited 
+        self.plan_visited = set()    # positions already planned to be visited
         self.plan_rtime = self.TLIM  # the remaing time during the planning phase
         self.plan_walk_time = 0.0    # previewed time to walk during rescue
         self.x = 0                   # the current x position of the rescuer when executing the plan
         self.y = 0                   # the current y position of the rescuer when executing the plan
         self.clusters = clusters     # the clusters of victims this agent should take care of - see the method cluster_victims
-        self.sequences = clusters    # the sequence of visit of victims for each cluster 
-        
+        self.sequences = clusters    # the sequence of visit of victims for each cluster
+
         self.config_ag_folder = config_ag_folder
         self.env = env
-        
-                
+
+
         # Starts in IDLE state.
         # It changes to ACTIVE when the map arrives
         self.set_state(VS.IDLE)
@@ -93,12 +95,12 @@ class Rescuer(AbstAgent):
         print("Clusters salvos em /clusters")
 
     def save_sequence_csv(self, sequence, sequence_id):
-        
+
         # Caminho absoluto para o diretório pai da pasta atual (mas)
         parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         seqs_dir = os.path.join(parent_dir, "seqs")
         os.makedirs(seqs_dir, exist_ok=True)
-        
+
         filename = os.path.join(seqs_dir, f"seq{sequence_id}.txt")
         with open(filename, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
@@ -112,10 +114,10 @@ class Rescuer(AbstAgent):
 
                 :param victims: dicionário no formato {id: ((x, y), sinais_vitais)}
                 :param n_clusters: número de clusters (igual ao número de socorristas)
-                
+
                 :return: lista de clusters, cada um é uma lista de ids de vítimas
         """
-        
+
         print("Agrupando vítimas em", self.nb_of_explorers, "clusters...")
 
         if len(self.victims) < self.nb_of_explorers:
@@ -144,7 +146,7 @@ class Rescuer(AbstAgent):
     def predict_severity_and_class(self):
         """ Prediz gravidade (regressão) e classe (classificação) para cada vítima usando modelos treinados.
         Usa os sinais vitais como entrada e armazena os resultados na lista de sinais vitais da vítima. """
-        
+
         # Caminho dos modelos
         MODEL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src", "model"))
         rf_reg_path = os.path.join(MODEL_DIR, "best_rf_reg.joblib")
@@ -153,7 +155,6 @@ class Rescuer(AbstAgent):
 
         # Tenta carregar os modelos, se não existir, chama o script de treino
         try:
-            print("Carregando modelos...")
             rf_reg = joblib.load(rf_reg_path)
             xgb_clf = joblib.load(xgb_clf_path)
             scaler = joblib.load(scaler_path)
@@ -169,7 +170,28 @@ class Rescuer(AbstAgent):
             rf_reg = joblib.load(rf_reg_path)
             xgb_clf = joblib.load(xgb_clf_path)
             scaler = joblib.load(scaler_path)
-        
+
+        # LIME setup
+        dataset_path = os.path.join(MODEL_DIR, "data_4000v", "env_vital_signals.csv")
+        train_data = np.loadtxt(dataset_path, delimiter=",", skiprows=1, usecols=range(1, 7))
+        train_labels_classe = np.loadtxt(dataset_path, delimiter=",", skiprows=1, usecols=7)
+
+        feature_names = ["qPA", "pulso", "freq_resp", "qPA/pulso", "pulso*freq", "qPA-pulso"]
+        class_names = ["Crítico", "Instável", "Pot. Estável", "Estável"]
+
+        self.explainer_clf = LimeTabularExplainer(train_data, mode="classification",
+                                                  training_labels=train_labels_classe,
+                                                  feature_names=feature_names,
+                                                  class_names=class_names,
+                                                  discretize_continuous=True)
+        self.explainer_reg = LimeTabularExplainer(train_data, mode="regression",
+                                                  feature_names=feature_names,
+                                                  discretize_continuous=True)
+
+        self.xgb_clf = xgb_clf
+        self.rf_reg = rf_reg
+        self.class_names = class_names
+
         for vic_id, values in self.victims.items():
             coords, vs = values
 
@@ -193,11 +215,53 @@ class Rescuer(AbstAgent):
 
             # Atualiza sinais vitais com as predições
             vs = vs[:6]  # remove predições anteriores
-            vs.extend([grav_pred, int(classe_pred) + 1])  # + 1 Corrige classe para 1-4
+            vs.extend([grav_pred, int(classe_pred)])
             self.victims[vic_id] = (coords, vs)
 
+        explained_classes = set()
+        for vid, (coord, vs) in self.victims.items():
+            cls = int(vs[7])
+            if cls in {1, 2, 3, 4} and cls not in explained_classes:
+                print(self.explain_victim_decision(vid))
+                explained_classes.add(cls)
+            if explained_classes == {1, 2, 3, 4}:
+                break
+
+    def explain_victim_decision(self, vic_id):
+        coords, vs = self.victims[vic_id]
+        qPA = vs[0]; pulso = vs[1]; freq = vs[2]
+        qPA_pulso_ratio = qPA / pulso if pulso != 0 else 0
+        pulso_freq_prod = pulso * freq
+        qPA_minus_pulso = qPA - pulso
+        features = np.array([qPA, pulso, freq, qPA_pulso_ratio, pulso_freq_prod, qPA_minus_pulso])
+
+        class_pred = int(vs[7])
+        exp_clf = self.explainer_clf.explain_instance(features, self.xgb_clf.predict_proba,
+                                                      num_features=6, labels=[class_pred])
+        try:
+            contrib_clf = exp_clf.as_list(label=class_pred)
+        except KeyError:
+            top_label = exp_clf.available_labels()[0]
+            contrib_clf = exp_clf.as_list(label=top_label)
+
+        exp_reg = self.explainer_reg.explain_instance(features, self.rf_reg.predict, num_features=6)
+        contrib_reg = exp_reg.as_list()
+
+        class_name = self.class_names[class_pred - 1]
+        severidade = vs[6]
+        explanation_text = f"Vítima {vic_id}: classificada como {class_name} (classe {class_pred}) " \
+                           f"com gravidade prevista = {severidade:.1f}. "
+        explanation_text += "Principais fatores para classificação: "
+        explanation_text += "; ".join([f"{feat} (peso {weight:+.2f})" for feat, weight in contrib_clf])
+        explanation_text += ". Fatores principais para gravidade: "
+        explanation_text += "; ".join([f"{feat} (peso {weight:+.2f})" for feat, weight in contrib_reg])
+        return explanation_text
 
     def sequencing(self, cluster):
+
+        print("Explicações das vítimas no cluster:")
+        for victim in cluster:
+            print(self.explain_victim_decision(victim))
 
         new_sequences = []
 
@@ -214,7 +278,7 @@ class Rescuer(AbstAgent):
 
         # for each victim of the first sequence of rescue for this agent, we're going go calculate a path
         # starting at the base - always at (0,0) in relative coords
-        
+
         if not self.sequences:   # no sequence assigned to the agent, nothing to do
             return
 
@@ -228,9 +292,11 @@ class Rescuer(AbstAgent):
             goal = self.victims[vic_id][0]
             plan = aStar.search(start, goal)
             time = plan[len(plan)- 1][1] * 1.2 + 1 # Assume que pode perder mais tempo do que o planejado
-            base_plan = aStar.search(goal, base) 
+            base_plan = aStar.search(goal, base)
             base_time = base_plan[len(base_plan) - 1][1] * 1.2 # O mesmo vale para o caminho de volta ao base
             if(self.plan_rtime - time < base_time + 60): # +60 de gap
+                print(f"Vítima {vic_id} não será socorrida devido ao tempo escasso restante.")
+                print(self.explain_victim_decision(vic_id))
                 continue
             total_plan = total_plan + plan
             self.plan_rtime = self.plan_rtime - time
@@ -253,9 +319,9 @@ class Rescuer(AbstAgent):
         # Atualiza mapa global de vítimas
         for vid, (coords, signals) in victims.items():
             self.victims[vid] = (coords, signals)
-            
+
         self.received_maps += 1
-        
+
         if self.received_maps == self.nb_of_explorers:
             print("Fase de exploração terminada")
             self.predict_severity_and_class()
@@ -264,16 +330,22 @@ class Rescuer(AbstAgent):
                 filename = f"rescuer_{exp:1d}_config.txt"
                 rescuer_file = os.path.join(self.config_ag_folder, filename)
                 rescuer = Rescuer(self.env, rescuer_file, self.config_ag_folder, self.nb_of_explorers)
+                # share relevant attributes with the rescuer
+                rescuer.explainer_clf = self.explainer_clf
+                rescuer.explainer_reg = self.explainer_reg
+                rescuer.xgb_clf = self.xgb_clf
+                rescuer.rf_reg = self.rf_reg
+                rescuer.class_names = self.class_names
                 rescuer.victims = self.victims  # share the victims with the rescuer
                 rescuer.clusters = self.clusters  # share the clusters with the rescuer
                 rescuer.map = self.map
-                rescuer.sequencing(self.clusters[exp-1])  
+                rescuer.sequencing(self.clusters[exp-1])
                 rescuer.planner()
                 rescuer.set_state(VS.ACTIVE)  # set the rescuer to ACTIVE state
-            self.sequencing(self.clusters[0])  
+            self.sequencing(self.clusters[0])
             self.planner()
             self.set_state(VS.ACTIVE)  # set the rescuer to ACTIVE state
-        
+
     def deliberate(self) -> bool:
         """ This is the choice of the next action. The simulator calls this
         method at each reasonning cycle if the agent is ACTIVE.
@@ -306,9 +378,8 @@ class Rescuer(AbstAgent):
                     self.first_aid()
                     self.plan_rtime -= 1
                     #if self.first_aid(): # True when rescued
-                        #print(f"{self.NAME} Victim rescued at ({self.x}, {self.y})")                    
+                        #print(f"{self.NAME} Victim rescued at ({self.x}, {self.y})")
         else:
             print(f"{self.NAME} Plan fail - walk error - agent at ({self.x}, {self.x})")
-            
-        return True
 
+        return True
