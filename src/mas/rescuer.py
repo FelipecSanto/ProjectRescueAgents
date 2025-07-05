@@ -202,14 +202,6 @@ class Rescuer(AbstAgent):
         Sequenciamento das vítimas
         """
 
-        # Define multiplicadores por classe de gravidade
-        pesos_gravidade = {
-            "grave": 1.0,
-            "estável": 1.2,
-            "moderado": 1.1  # exemplo, caso exista
-        }
-
-
         # Posição inicial
         pos_atual = (0, 0)
 
@@ -224,7 +216,7 @@ class Rescuer(AbstAgent):
                 key=lambda v: ((self.victims[v][0][0] - pos_atual[0])**2 + 
                                (self.victims[v][0][1] - pos_atual[1])**2
                                *
-                                (1.0 + (self.victims[v][1][7] - 1) * 0.1))
+                                (self.victims[v][1][7] * 1.1))
             )
 
             # Adiciona à sequência
