@@ -55,7 +55,8 @@ class Rescuer(AbstAgent):
         self.x = 0                   # the current x position of the rescuer when executing the plan
         self.y = 0                   # the current y position of the rescuer when executing the plan
         self.clusters = clusters     # the clusters of victims this agent should take care of - see the method cluster_victims
-        self.sequences = clusters    # the sequence of visit of victims for each cluster 
+        self.sequences = []          # the sequence of visit of victims for each cluster 
+        self.victims_left = []
         
         self.config_ag_folder = config_ag_folder
         self.env = env
@@ -136,7 +137,6 @@ class Rescuer(AbstAgent):
         print("Clusters criados!")
 
         self.clusters = list(clusters.values())
-        self.sequences = self.clusters
 
         # Salva os clusters usando os valores de severidade e classe previstos
         self.save_clusters_csv(self.clusters)
@@ -197,7 +197,7 @@ class Rescuer(AbstAgent):
             self.victims[vic_id] = (coords, vs)
 
 
-    def sequencing(self, cluster):
+    def sequencing(self, cluster, left = []):
         """
         Sequenciamento das vítimas
         """
@@ -206,15 +206,15 @@ class Rescuer(AbstAgent):
         pos_atual = (0, 0)
 
         # Copia das vítimas do cluster
-        victims = set(cluster)
+        victims = set(cluster + left)
         sequence = []
 
         while victims:
             # Encontra a vítima mais próxima da posição atual com um peso da classe
             close_victim = min(
                 victims,
-                key=lambda v: ((self.victims[v][0][0] - pos_atual[0])**2 + 
-                               (self.victims[v][0][1] - pos_atual[1])**2
+                key=lambda v: (((self.victims[v][0][0] - pos_atual[0])**2 + 
+                               (self.victims[v][0][1] - pos_atual[1])**2)
                                *
                                 (self.victims[v][1][7] * 1.1))
             )
@@ -233,7 +233,7 @@ class Rescuer(AbstAgent):
 
         self.sequences = sequence
 
-    def planner(self):
+    def planner(self, total_left = []):
         """ A method that calculates the path between victims: walk actions in a OFF-LINE MANNER (the agent plans, stores the plan, and
             after it executes. Eeach element of the plan is a pair dx, dy that defines the increments for the the x-axis and  y-axis."""
 
@@ -251,6 +251,7 @@ class Rescuer(AbstAgent):
         base = (0,0)
         start = (0,0)
         total_plan = []
+        self.plan = []
         for vic_id in self.sequences:
             goal = self.victims[vic_id][0]
             plan = aStar.search(start, goal)
@@ -258,15 +259,23 @@ class Rescuer(AbstAgent):
             base_plan = aStar.search(goal, base) 
             base_time = base_plan[len(base_plan) - 1][1] * 1.2 # O mesmo vale para o caminho de volta ao base
             if(self.plan_rtime - time < base_time + 60): # +60 de gap
+                self.victims_left.append(vic_id)
                 continue
+
             total_plan = total_plan + plan
             self.plan_rtime = self.plan_rtime - time
             start = goal
 
+            if vic_id in total_left:
+                total_left.remove(vic_id)
+
         # Plan to come back to the base
         plan = aStar.search(start, base)
         total_plan = total_plan + plan
-        anterior = total_plan[1][0]
+        if start != base:
+            anterior = total_plan[1][0]
+        else:
+            anterior = total_plan[0][0]
         self.plan.append(anterior) # add the first action to the plan
         for p in total_plan[2:]:
             x = p[0][0] - anterior[0]
@@ -285,22 +294,44 @@ class Rescuer(AbstAgent):
         
         if self.received_maps == self.nb_of_explorers:
             print("Fase de exploração terminada")
+            rescuers = []
+            rescuers.append(self)
+
             self.predict_severity_and_class()
             self.cluster_victims()
-            for exp in range(2, self.nb_of_explorers + 1):
-                filename = f"rescuer_{exp:1d}_config.txt"
-                rescuer_file = os.path.join(self.config_ag_folder, filename)
-                rescuer = Rescuer(self.env, rescuer_file, self.config_ag_folder, self.nb_of_explorers)
-                rescuer.victims = self.victims  # share the victims with the rescuer
-                rescuer.clusters = self.clusters  # share the clusters with the rescuer
-                rescuer.map = self.map
-                rescuer.sequencing(self.clusters[exp-1])  
-                rescuer.planner()
-                rescuer.set_state(VS.ACTIVE)  # set the rescuer to ACTIVE state
             self.sequencing(self.clusters[0])  
             self.planner()
             self.set_state(VS.ACTIVE)  # set the rescuer to ACTIVE state
-        
+
+            for rescuer in range(2, self.nb_of_explorers + 1):
+                rescuers.append(self.setup_rescuer(rescuer))
+
+            # Junta todos as vítimas restantes que não foram salvas pelo rescuer do cluster
+            total_left = []
+            for r in rescuers:
+                total_left = total_left + r.victims_left
+
+            # Joga as vítimas restantes no rescuer que tem tempo (No caso, que não tem nenhuma vítima restante)
+            for r in rescuers:
+                if not r.victims_left and total_left:
+                    r.sequencing(r.sequences, total_left)
+                    r.planner(total_left)
+
+    def setup_rescuer(self, index):
+        filename = f"rescuer_{index}_config.txt"
+        rescuer_file = os.path.join(self.config_ag_folder, filename)
+        rescuer = Rescuer(self.env, rescuer_file, self.config_ag_folder, self.nb_of_explorers)
+
+        # Compartilha os dados do mestre com os demais
+        rescuer.victims = self.victims
+        rescuer.clusters = self.clusters
+        rescuer.map = self.map
+
+        rescuer.sequencing(self.clusters[index-1])
+        rescuer.planner()
+        rescuer.set_state(VS.ACTIVE)
+        return rescuer
+    
     def deliberate(self) -> bool:
         """ This is the choice of the next action. The simulator calls this
         method at each reasonning cycle if the agent is ACTIVE.
