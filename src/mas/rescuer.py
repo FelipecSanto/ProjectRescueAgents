@@ -198,13 +198,48 @@ class Rescuer(AbstAgent):
 
 
     def sequencing(self, cluster):
+        """
+        Sequenciamento das vítimas
+        """
 
-        new_sequences = []
+        # Define multiplicadores por classe de gravidade
+        pesos_gravidade = {
+            "grave": 1.0,
+            "estável": 1.2,
+            "moderado": 1.1  # exemplo, caso exista
+        }
 
-        for victim in sorted(cluster, key=lambda v: self.victims[v][1][7], reverse=True):
-            new_sequences.append(victim)
 
-        self.sequences = new_sequences
+        # Posição inicial
+        pos_atual = (0, 0)
+
+        # Copia das vítimas do cluster
+        victims = set(cluster)
+        sequence = []
+
+        while victims:
+            # Encontra a vítima mais próxima da posição atual com um peso da classe
+            close_victim = min(
+                victims,
+                key=lambda v: ((self.victims[v][0][0] - pos_atual[0])**2 + 
+                               (self.victims[v][0][1] - pos_atual[1])**2
+                               *
+                                (1.0 + (self.victims[v][1][7] - 1) * 0.1))
+            )
+
+            # Adiciona à sequência
+            sequence.append(close_victim)
+
+            # Atualiza a posição atual
+            pos_atual = (
+                self.victims[close_victim][0][0],
+                self.victims[close_victim][0][1]
+            )
+
+            # Remove a vítima visitada
+            victims.remove(close_victim)
+
+        self.sequences = sequence
 
     def planner(self):
         """ A method that calculates the path between victims: walk actions in a OFF-LINE MANNER (the agent plans, stores the plan, and
