@@ -86,14 +86,19 @@ class Explorer(AbstAgent):
             if cont > 8:
                 cont = 1
                 cont_back += 1
-                result = self.walk_stack[-cont_back]
-                virtual_pos = virtual_pos[0] - result[0], virtual_pos[1] - result[1]
+
+                if self.walk_stack:
+                    result = self.walk_stack[-cont_back]
+                    virtual_pos = virtual_pos[0] - result[0], virtual_pos[1] - result[1]
+
                 if virtual_pos == (0,0):
                     if not self.finishedQ:
                         return self.aumenta_quadrante()
                     else:
                         self.goto_astar((0, 0))
                         self.finishedAll = True
+                        if not self.goto:
+                            return (0, 0)
                         return self.get_next_position()
             
             result = self.verifica_direcao(virtual_pos)
