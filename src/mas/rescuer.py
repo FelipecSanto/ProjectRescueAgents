@@ -56,6 +56,7 @@ class Rescuer(AbstAgent):
         self.y = 0                   # the current y position of the rescuer when executing the plan
         self.clusters = clusters     # the clusters of victims this agent should take care of - see the method cluster_victims
         self.sequences = []          # the sequence of visit of victims for each cluster 
+        self.sequences_left = []
         self.victims_left = []
         
         self.config_ag_folder = config_ag_folder
@@ -203,10 +204,14 @@ class Rescuer(AbstAgent):
         """
 
         # Posição inicial
-        pos_atual = (0, 0)
+        pos_atual = self.x, self.y
 
-        # Copia das vítimas do cluster
-        victims = set(cluster + left)
+        # Cópia das vítimas do cluster
+        if not left:
+            victims = set(cluster)
+        else:
+            victims = set(left)
+            
         sequence = []
 
         while victims:
@@ -231,7 +236,10 @@ class Rescuer(AbstAgent):
             # Remove a vítima visitada
             victims.remove(close_victim)
 
-        self.sequences = sequence
+        if not left:
+            self.sequences = sequence
+        else:
+            self.sequences_left = sequence
 
     def planner(self, total_left = []):
         """ A method that calculates the path between victims: walk actions in a OFF-LINE MANNER (the agent plans, stores the plan, and
@@ -251,8 +259,14 @@ class Rescuer(AbstAgent):
         base = (0,0)
         start = (0,0)
         total_plan = []
-        self.plan = []
-        for vic_id in self.sequences:
+
+        sequence = []
+        if not total_left:
+            sequence = self.sequences
+        else:
+            sequence = self.sequences_left
+
+        for vic_id in sequence:
             goal = self.victims[vic_id][0]
             plan = aStar.search(start, goal)
             time = plan[len(plan)- 1][1] * 1.2 + 1 # Assume que pode perder mais tempo do que o planejado
