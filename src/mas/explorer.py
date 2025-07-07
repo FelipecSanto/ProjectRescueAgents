@@ -314,7 +314,7 @@ class Explorer(AbstAgent):
 
         # forth and back: go, read the vital signals and come back to the position
         
-        if self.update_cont >= 200:
+        if self.update_cont >= 200 and self.last_path:
             self.return_path = self.aStar.search((self.x, self.y), (0, 0))
                 
             last_item = self.return_path[::-1][0]
