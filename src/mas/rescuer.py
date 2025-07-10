@@ -392,6 +392,20 @@ class Rescuer(AbstAgent):
                     r.sequencing(r.sequences, total_left)
                     r.planner(total_left)
 
+            parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            seq_dir = os.path.join(parent_dir, "sequencing")
+            os.makedirs(seq_dir, exist_ok=True)
+
+            for i, r in enumerate(rescuers, start=1):
+                file_path = os.path.join(seq_dir, f"sequence{i}.txt")
+                with open(file_path, "w") as f:
+                    for s in r.sequences:
+                        x, y = self.victims[s][0]
+                        vs = self.victims[s][1]
+                        grav = vs[-2]
+                        classe = vs[-1]
+                        f.write(f"{s},{x},{y},{grav},{classe}\n")
+
             # Se sobrou algum, avisa na explicabilidade
             for victim in total_left:
                 print(f"Vítima {victim} não será socorrida pelo devido ao tempo escasso restante.")
